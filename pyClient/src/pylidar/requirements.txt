@@ -1,0 +1,4 @@
+pyserial
+logzero
+websocket_client == 0.52.0
+apscheduler
