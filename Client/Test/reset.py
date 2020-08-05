@@ -1,15 +1,15 @@
-import os
-import sys
+import os, sys, time
 import threading
 
-import play
-import record
+from play import playprompt
 
 def main():
     file='Empty' #sys.argv[1] #input("FileName:")
     if not os.path.exists(file):
         os.makedirs(file)
-    out = os.popen('sh runforDetect.sh '+file +' 0 0').read().replace('\n', '')# 0 0
+    #playprompt("网络连接成功.wav")
+    #time.sleep(2)
+    out = os.popen('sh runforDetect.sh '+file +' 0 5'+' reset').read().replace('\n', '')# 0 0
     '''
     threads=[]
     threads.append(threading.Thread(target=play.playaudio, args=(0,)))

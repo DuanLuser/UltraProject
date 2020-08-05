@@ -1,15 +1,20 @@
 import os
 import sys
 
-def playaudio(ch):
-    choice = int(ch)
-    if choice == 0:
-        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms.wav')#网络连接成功.wav')
-    elif choice == 1:
-        os.system('aplay -D "plughw:1,0" audio/18k-22k10ms.wav')
-        
+def playaudio(choice):
+    if choice == 'reset':
+        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms-8.wav')
+    elif choice == 'detect-0':
+        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms-4.wav')
+    elif choice == 'detect-1':
+        os.system('aplay -D "plughw:1,0" audio/18k-22k10ms-4.wav')
+
+def playprompt(wav):
+    os.popen('aplay -D "plughw:0,0" audio/'+ wav)
+    
+    
 if __name__=="__main__":
-    sys.exit(playaudio(0))
+    sys.exit(playaudio(sys.argv[1]))
 '''
 import pyaudio
 import wave

@@ -18,11 +18,13 @@ def Top2(data):
         array.append(max(float(num[0]),abs(float(num[1]))-1))#二者取最大，正负一定有三个mic低于该阈值，abs(负)=正+1
     array.sort()
     #print(max(array_z[3],array_f[3])) 
-    site=array[4]#array[2]
+    site=array[3]#array[2]
     if site == 2147483646 or site<0.5:
         site = 0.5
-    if site>6:
+    if site>15:
         print(data)
+    if site > 15:
+        site=15
     COUNT[math.ceil(site*2)-1]+=1
     
 

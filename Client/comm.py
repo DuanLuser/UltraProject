@@ -14,13 +14,15 @@
 import logzero
 import logging
 import json
+import time
 from datetime import datetime,timedelta
 from websocket import WebSocketApp
 from apscheduler.schedulers.background import BackgroundScheduler
+from threading import Thread, Event, Lock
 
 from Detector import URadar
+from play import playprompt
 from ObstaclesStatus import ObstacleStatus
-from threading import Thread, Event, Lock
 
 logger = logzero.setup_logger("Comm")
 
@@ -39,6 +41,7 @@ class ICommClient:
     server_ping_interval: int = 10      # ping服务器的时间间隔(秒)
     
     radar: URadar = URadar()
+    Obstacles: list = []
 
     ###########Protected成员#############
     _server_replied_event: Event = Event()  # 用于检测服务器在线
@@ -88,6 +91,8 @@ class ICommClient:
         """
         self._is_connected = True
         logger.info(f"连接到服务器成功: {self.server_url}")
+        playprompt("网络连接成功.wav")
+        time.sleep(2)
 
         # 移除连接定时器
         self._scheduler.remove_job("Connect")
@@ -132,6 +137,8 @@ class ICommClient:
             原因描述, by default ""
         """
         logger.info(f"无法连接到服务器({reason})，{self.server_connect_interval}s后重试")
+        playprompt("网络连接失败，正在重新连接.wav")
+        time.sleep(3)
 
     def OnMessage(self, message: str):
         """接收到服务器消息时
@@ -151,6 +158,7 @@ class ICommClient:
             
         if message == "reset":
             self.radar.reset_order=True
+            self.Obstacles.clear()
             self.Send("resetOk")
                       
 
@@ -182,9 +190,9 @@ class ICommClient:
     #############雷达检测############
     def DetectReport(self):
         
-        Obstacles=[]
         reset_limit = timedelta(minutes = 10)
         empty_count = 0
+        prompt_count = 0
         Reported=False
         
         if self.radar.reset()=="OK":
@@ -193,18 +201,26 @@ class ICommClient:
                 outcome = self.radar.detect()
                 if outcome=="nonempty":
                     empty_count = 0
-                    if len(Obstacles)==0:
+                    if len(self.Obstacles)==0:
                         obstacle=ObstacleStatus()
-                        Obstacles.append(obstacle)
+                        self.Obstacles.append(obstacle)
+                        prompt_count = 0
+                        Reported=False
                     #else: 后续判断障碍物是否改变
-                if outcome=="empty" and len(Obstacles)!=0:
-                    Obstacles.clear()
+                    if prompt_count < 3: # 连续提示次数
+                        playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
+                        time.sleep(5)
+                        prompt_count+=1  
+                if outcome=="empty" and len(self.Obstacles)!=0:
+                    self.Obstacles.clear()
+                    playprompt("障碍物已移除，谢谢配合.wav")
+                    time.sleep(3)
                     if Reported==True:
                         self.Send(json.dumps({"cmd": "removed", "data": ["0"]}))
                         logger.info("障碍物移除已上报！")
                     
                 now_time=datetime.now()
-                for ob in Obstacles:    
+                for ob in self.Obstacles:    
                     if now_time-ob.FirstAppear > ob.ReportLimit and ob.IsReport==False:
                         self.Send(json.dumps(ob.DetectedInfo))
                         ob.IsReport=True

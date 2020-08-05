@@ -22,24 +22,25 @@ def FilterBandpass(wave, fs, low, high):
     return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
 
-def averageNormalization(corr):
+def averageNormalization(micnum,corr):
     '''多个周期取平均'''
     global cSlice, rid
     distance=24480
     #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
     peaks=[]
-    i=1000
+    i=10000
     first=1
     while i+distance < corr.size:
         site=np.argmax(corr[i:i+distance])+i
-        if corr[site] > 100 :
-            if first >= 2:
+        if corr[site] > 150000 :
+            if first >= 1:
                 peaks.append(site)
+                #print(i,micnum,site)
             else: first+=1
         i+=distance
     
     cycles = []
-    #print(len(peaks))
+    print(len(peaks))
     for p in peaks:
         c = {}
         c["PeakIndex"] = p
@@ -89,10 +90,19 @@ def process(micInfo):
     # 互相关
     corr = np.correlate(fliter_y, chirp, mode='full')
     corr1 = np.correlate(fliter_y1, chirp, mode='full')
+    '''
+    if True:
+        figureno+=1
+        plt.figure(figureno)
+        plt.plot(corr)
+        plt.plot(corr1)
+        plt.title(str(micnum))
+    '''
     
     # 平均 and 归一化
-    Ncorr, maxv = averageNormalization(corr)
-    Ncorr1, maxv1 = averageNormalization(corr1)
+    Ncorr, maxv = averageNormalization(micnum,corr)
+    Ncorr1, maxv1 = averageNormalization(micnum,corr1)
+    #plt.show()
     aNcorr = Ncorr/200000            #经验值
     aNcorr1 = Ncorr1/200000
 
@@ -130,7 +140,7 @@ def process(micInfo):
         #plt.title('Envelope Detection')
         plt.xlabel('Distance(m)')
         plt.ylabel('Correlation')
-        plt.show()
+        #plt.show()
 
 
     #提取图2(The Other)中高于/低于图1(Empty)的所有点
@@ -272,9 +282,9 @@ def RecordAudio(PATH, choice):
         os.makedirs(PATH)
     out=''
     if choice==0:
-        out = os.popen('sh runforDetect.sh '+PATH+' '+'0 0').read().replace('\n', '')#0,0
+        out = os.popen('sh runforDetect.sh '+PATH+' '+'0 3'+' detect-0').read().replace('\n', '')#0,0
     else:
-        out = os.popen('sh runforDetect.sh '+PATH+' '+'2 1').read().replace('\n', '')
+        out = os.popen('sh runforDetect.sh '+PATH+' '+'2 3'+' detect-1').read().replace('\n', '')
     print(out)
     #recordFile.recordWAV(PATH)
 
@@ -286,8 +296,8 @@ def main():
     
     figureno=0
 
-    thdz = 7.5           # 5.5 
-    thdf = 8.5           # 6.5
+    thdz = 6           # 5.5 
+    thdf = 7           # 6.5
     cSlice = 988       # 3.5 m
     rid = 70           # no obstacles in 25 cm 
     mics=[1,3,4,5,6]
@@ -299,7 +309,7 @@ def main():
     postfix = 1
     count1 = 0
     stability_count=0
-    if count < 5: # 3
+    if count < 4: # 3
         time.sleep(4)
         # 判断环境是否稳定
         RecordAudio(PATH2, 0)
@@ -315,14 +325,14 @@ def main():
         count = forEveryMic(PATH1, PATH2, mics)
     
     outcome=''
-    if count >= 5: # 3
+    if count >= 4: # 3
         outcome='empty'
         #if count >=5 :
         #    for i in range(1,7):
         #        os.remove(''.join(['empty/mic',str(i),'.wav']))
         #        shutil.copyfile(''.join([PATH2,'/mic',str(i),'.wav']),''.join(['empty/mic',str(i),'.wav']))
     else:
-        outcome='nonempty,1,1.00m'
+        outcome='nonempty'
         #outcome='empty'
     file.writelines(outcome+'\n')
     file.close()

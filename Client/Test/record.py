@@ -7,19 +7,19 @@ import contextlib
 
 
 @contextlib.contextmanager
-def ignore_stderr(path,index):
+def ignore_stderr(path,index,time):
     devnull = os.open(os.devnull, os.O_WRONLY)
     old_stderr = os.dup(2)
     sys.stderr.flush()
     os.dup2(devnull, 2)
     os.close(devnull)
     try:
-        recordaudio(path, index)
+        recordaudio(path, index, time)
     finally:
         os.dup2(old_stderr, 2)
         os.close(old_stderr)
 
-def recordaudio(path, index):
+def recordaudio(path, index, time):
     PATH = path
 
     RESPEAKER_RATE = 48000
@@ -28,7 +28,7 @@ def recordaudio(path, index):
     # run getDeviceInfo.py to get index
     RESPEAKER_INDEX = int(index)  #0,0; 2 refer to input device id
     CHUNK = 1024
-    RECORD_SECONDS = 5
+    RECORD_SECONDS = int(time) # reset:5; detect:3
     WAVE_OUTPUT_FILENAME = []
 
     for i in range(6):
@@ -77,7 +77,7 @@ def recordaudio(path, index):
 
 if __name__=="__main__":
     #ignore_stderr('Empty',2)#sys.argv[1], sys.argv[2])
-    ignore_stderr(sys.argv[1], sys.argv[2])
+    ignore_stderr(sys.argv[1], sys.argv[2], sys.argv[3])
     #sys.exit(recordaudio('Empty',2))
 
 

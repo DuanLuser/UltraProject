@@ -23,8 +23,8 @@ logger = logzero.setup_logger("client", level=logging.INFO)
 
 class URadar:
     '''封装类'''
-    thdz: int               #7.5           # 5.5 
-    thdf: int               #8.5           # 6.5
+    thdz: float             #7.5           # 5.5 
+    thdf: float             #8.5           # 6.5
     cSlice: int             #988       # 3.5 m
     rid: int                #70           # no obstacles in 25 cm 
     outcome: str
@@ -50,7 +50,7 @@ class URadar:
         logger.info("正在重置...")
         if not os.path.exists(self._PATH1):
             os.makedirs(self._PATH1)
-        out = os.popen('sh runforDetect.sh '+self._PATH1 +' 0 0').read().replace('\n', '')# 0 0
+        out = os.popen('sh runforDetect.sh '+self._PATH1 +' 0 5'+' reset').read().replace('\n', '')# 0 0
         if out=="OK":
             logger.info("重置成功！")
         else:
@@ -69,14 +69,12 @@ class URadar:
         distance=24480              # t=051s;  rate=48000
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks=[]
-        i=1000
+        i=10000
         first=1
         while i+distance < corr.size:
             site=np.argmax(corr[i:i+distance])+i
-            if corr[site] > 100 :
-                if first >= 2:
-                    peaks.append(site)
-                else: first+=1
+            if corr[site] > 150000 :
+                peaks.append(site)
             i+=distance
     
         cycles = []
@@ -285,9 +283,9 @@ class URadar:
             self.reset_order=False
             
         if choice==0:
-            out = os.popen('sh runforDetect.sh '+PATH+' '+'0 0').read().replace('\n', '')#0,0
+            out = os.popen('sh runforDetect.sh '+PATH+' '+'0 3'+' detect-0').read().replace('\n', '')#0,0
         else:
-            out = os.popen('sh runforDetect.sh '+PATH+' '+'2 1').read().replace('\n', '')
+            out = os.popen('sh runforDetect.sh '+PATH+' '+'2 3'+' detect-1').read().replace('\n', '')
         print(out)
         #recordFile.recordWAV(PATH)
 
@@ -295,7 +293,7 @@ class URadar:
     
         self.RecordAudio(self._PATH2, 0)
         count = self.forEveryMic(self._PATH1, self._PATH2, self.mics)
-        if count < 5: # 3
+        if count < 4: # 3
             time.sleep(4)
             # 判断环境是否稳定
             scount=0
@@ -313,7 +311,7 @@ class URadar:
                 scount+=1
             count = self.forEveryMic(self._PATH1, PATH2, self.mics)
     
-        if count >= 5: # 3
+        if count >= 4: # 3
             self.outcome='empty'
             #if count >=5 :
             #    for i in range(1,7):
@@ -322,7 +320,6 @@ class URadar:
         else:
             self.outcome='nonempty'
             #self.outcome='empty'
-        print(self.outcome)
         logger.info(f"检测结果：{self.outcome}")
         time.sleep(1)
         return self.outcome
@@ -335,7 +332,7 @@ if __name__ == "__main__":
     # ws.device_id = "2"
     # ws.Start()
 
-    Radar=URadar(None)
+    Radar=URadar()
     reset_choice=input('reset_or_not:')
     if reset_choice=='1':
         Radar.reset()
