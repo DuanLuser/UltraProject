@@ -18,6 +18,10 @@ import logzero
 import warnings
 warnings.filterwarnings("ignore")
 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import mpl_toolkits.mplot3d
+
 logger = logzero.setup_logger("client", level=logging.INFO)
 
 
@@ -28,19 +32,25 @@ class URadar:
     cSlice: int             #988       # 3.5 m
     rid: int                #70           # no obstacles in 25 cm 
     outcome: str
+    prompt: str = 'None'
 
     figureno=0
-    mics=[1,3,4,5,6]
+    mics=[1,3,5,6]
     stability_count=2
     process_result=[]
-    nor_val=200000           #经验值
+    nor_val=300000           #经验值
     reset_order=False
     
     _PATH1='Empty'
     _PATH2='Barrier/barrier'
-
-
-    def __init__(self, thdz=7.5, thdf=8.5, cSlice=988, rid=70) -> None:
+    
+    file=None
+    Data1=None#:np.array=[]
+    Data3=None#:np.array=[]
+    Data5=None#:np.array=[]
+    Data6=None#:np.array
+    
+    def __init__(self, thdz=5, thdf=6, cSlice=2117, rid=282) -> None:
         self.thdz=thdz
         self.thdf=thdf
         self.cSlice=cSlice
@@ -66,14 +76,14 @@ class URadar:
 
     def averageNormalization(self, corr):
         '''多个周期取平均'''
-        distance=24480              # t=051s;  rate=48000
+        distance=5280 #24480              # t=051s;  rate=48000
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks=[]
         i=10000
         first=1
         while i+distance < corr.size:
             site=np.argmax(corr[i:i+distance])+i
-            if corr[site] > 150000 :
+            if corr[site] > 100000 :
                 peaks.append(site)
             i+=distance
     
@@ -98,6 +108,7 @@ class URadar:
         return out, np.max(out)
 
     def process(self, PATH1, PATH2, micnum):
+        global ax, fig, CCOUNT
         '''处理音频，获得差异值(位于背景信号之上/之下)'''
         
         low = 18000
@@ -119,8 +130,8 @@ class URadar:
         fliter_y1 = self.FilterBandpass(y1, Fs1, low, high)
 
         # 互相关
-        corr = np.correlate(fliter_y, chirp, mode='full')
-        corr1 = np.correlate(fliter_y1, chirp, mode='full')
+        corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
+        corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
     
         # 平均 and 归一化
         Ncorr, maxv = self.averageNormalization(corr)
@@ -146,7 +157,26 @@ class URadar:
         y_smooth=func(x_new)
         func1=interpolate.interp1d(x1,y1, kind="cubic")
         y_smooth1=func1(x_new)
-
+        #print('Type',type(y_smooth1))
+        if micnum==1:
+            for d in y_smooth1:
+                self.Data1.write(("%.5f"%d)+',')
+            self.Data1.write('\n')
+        elif micnum==3:
+            #Data3.append(y_smooth1)
+            for d in y_smooth1:
+                self.Data3.write(("%.5f"%d)+',')
+            self.Data3.write('\n')
+        elif micnum==5:
+            #Data5.append(y_smooth1)
+            for d in y_smooth1:
+                self.Data5.write(("%.5f"%d)+',')
+            self.Data5.write('\n')
+        elif micnum==6:
+            #Data6.append(y_smooth1)
+            for d in y_smooth1:
+                self.Data6.write(("%.5f"%d)+',')
+            self.Data6.write('\n')
 
         #提取图2(The Other)中高于/低于图1(Empty)的所有点
         X=np.zeros(self.cSlice*2)
@@ -191,7 +221,7 @@ class URadar:
                         minusc+=1
                 i+=1
         
-            if addc >= 10*minusc or minusc >= 10*addc : # 7？ 有待测试确定
+            if addc >= 7*minusc or minusc >= 7*addc : # 7？ 有待测试确定
                 while mark < site and X[mark] >= 0 :
                     X[mark]=-0.01
                     Y[mark]=Y1[mark]=0
@@ -235,6 +265,11 @@ class URadar:
         #print('mic:%d'%micnum)
         for i in range(snum):
             delta_v=val1[i]-val[i]
+            maxD=(X[int(maxsite[i])]+self.rid)/rate*340/2
+            #if val[i]>10:
+            delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
+            #else:
+            #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
             if delta_v > self.thdz:
                 #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self.rid)/rate*340/2))
                 zflag=True
@@ -266,7 +301,11 @@ class URadar:
         for t in Threads:
             t.join()
         result=self.process_result
+        self.file.writelines('<<<<<<<<\n')
+        
         for i in range(len(result)):
+            self.file.writelines(str(result[i][0])+'---')
+            self.file.writelines('mx:'+('%.2f'%result[i][1])+',mi:-'+('%.2f'%abs(result[i][2]))+'\n')
             if result[i][1] <= self.thdz and (abs(result[i][2]) <= self.thdf or result[i][2]==2147483647): # 阈值的设定？ empty    有待检验
                 count+=1
         self.process_result.clear()
@@ -281,6 +320,10 @@ class URadar:
         if self.reset_order == True:
             self.reset()
             self.reset_order=False
+        #if self.prompt != 'None':
+            #print('prompt',self.prompt)
+            #out = os.popen('sh runforDetect.sh '+'None'+' 0 3 '+self.prompt).read().replace('\n', '')
+            #self.prompt='None'
             
         if choice==0:
             out = os.popen('sh runforDetect.sh '+PATH+' '+'0 3'+' detect-0').read().replace('\n', '')#0,0
@@ -290,10 +333,18 @@ class URadar:
         #recordFile.recordWAV(PATH)
 
     def detect(self):
-    
+        
+        self.file=open('Data.txt',mode='a+')
+        
+        self.Data1=open('MIC/Mic1.txt',mode='a+')
+        self.Data3=open('MIC/Mic3.txt',mode='a+')
+        self.Data5=open('MIC/Mic5.txt',mode='a+')
+        self.Data6=open('MIC/Mic6.txt',mode='a+')
+        
+        self.file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+'\n')
         self.RecordAudio(self._PATH2, 0)
         count = self.forEveryMic(self._PATH1, self._PATH2, self.mics)
-        if count < 4: # 3
+        if count < 3: # 3
             time.sleep(4)
             # 判断环境是否稳定
             scount=0
@@ -304,14 +355,14 @@ class URadar:
                 PATH3=self._PATH2+str(postfix)
                 self.RecordAudio(PATH3, 0)
                 count = self.forEveryMic(PATH2, PATH3, self.mics)
-                if (scount==0 and count < 4) or (scount==1 and count < 4): #5
+                if (scount==0 and count < 3) or (scount==1 and count < 3): #5
                     scount = 0
                 PATH2=PATH3
                 postfix+=1
                 scount+=1
             count = self.forEveryMic(self._PATH1, PATH2, self.mics)
     
-        if count >= 4: # 3
+        if count >= 3: # 3
             self.outcome='empty'
             #if count >=5 :
             #    for i in range(1,7):
@@ -321,9 +372,20 @@ class URadar:
             self.outcome='nonempty'
             #self.outcome='empty'
         logger.info(f"检测结果：{self.outcome}")
+        self.file.writelines(self.outcome+'\n')
+        self.file.close()
+        self.Data1.close()
+        self.Data3.close()
+        self.Data5.close()
+        self.Data6.close()
         time.sleep(1)
+        
         return self.outcome
     
+def continuelly(Radar):
+    while True:
+        Radar.detect()
+        
 
 if __name__ == "__main__":
     # 启动通讯客户端
@@ -331,7 +393,6 @@ if __name__ == "__main__":
     # ws.server_url = "ws://localhost:2714"
     # ws.device_id = "2"
     # ws.Start()
-
     Radar=URadar()
     reset_choice=input('reset_or_not:')
     if reset_choice=='1':

@@ -12,6 +12,12 @@ from multiprocessing import Pool
 from scipy import fftpack
 import shutil
 import datetime
+import math
+
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import mpl_toolkits.mplot3d
+
 
 
 def FilterBandpass(wave, fs, low, high):
@@ -25,14 +31,14 @@ def FilterBandpass(wave, fs, low, high):
 def averageNormalization(micnum,corr):
     '''多个周期取平均'''
     global cSlice, rid
-    distance=24480
+    distance=5280
     #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
     peaks=[]
     i=10000
     first=1
     while i+distance < corr.size:
         site=np.argmax(corr[i:i+distance])+i
-        if corr[site] > 150000 :
+        if corr[site] > 100000 :
             if first >= 1:
                 peaks.append(site)
                 #print(i,micnum,site)
@@ -40,7 +46,7 @@ def averageNormalization(micnum,corr):
         i+=distance
     
     cycles = []
-    print(len(peaks))
+    #print(len(peaks))
     for p in peaks:
         c = {}
         c["PeakIndex"] = p
@@ -60,9 +66,11 @@ def averageNormalization(micnum,corr):
     return out, np.max(out)
 
 
+
 def process(micInfo):
     '''处理音频，获得差异值(位于背景信号之上/之下)'''
     global cSlice, rid, thdz, thdf
+    global CCOUNT,ax,fig
     global figureno
     
     PATH1 = micInfo[0]
@@ -88,8 +96,8 @@ def process(micInfo):
     fliter_y1 = FilterBandpass(y1, Fs1, low, high)
 
     # 互相关
-    corr = np.correlate(fliter_y, chirp, mode='full')
-    corr1 = np.correlate(fliter_y1, chirp, mode='full')
+    corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
+    corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
     '''
     if True:
         figureno+=1
@@ -98,13 +106,12 @@ def process(micInfo):
         plt.plot(corr1)
         plt.title(str(micnum))
     '''
-    
     # 平均 and 归一化
     Ncorr, maxv = averageNormalization(micnum,corr)
     Ncorr1, maxv1 = averageNormalization(micnum,corr1)
     #plt.show()
-    aNcorr = Ncorr/200000            #经验值
-    aNcorr1 = Ncorr1/200000
+    aNcorr = Ncorr/300000            #经验值
+    aNcorr1 = Ncorr1/300000
 
     #获取极值点    
     x=signal.argrelextrema(aNcorr, np.greater)[0]
@@ -126,6 +133,7 @@ def process(micInfo):
     y_smooth1=func1(x_new)
     
     if True:
+
         figureno+=1
         plt.figure(figureno)
         label=['Empty','The other']
@@ -140,8 +148,9 @@ def process(micInfo):
         #plt.title('Envelope Detection')
         plt.xlabel('Distance(m)')
         plt.ylabel('Correlation')
+            
         #plt.show()
-
+    
 
     #提取图2(The Other)中高于/低于图1(Empty)的所有点
     X=np.zeros(cSlice*2)
@@ -186,7 +195,7 @@ def process(micInfo):
                    minusc+=1
            i+=1
         
-        if addc >= 10*minusc or minusc >= 10*addc : # 7？ 有待测试确定
+        if addc >= 7*minusc or minusc >= 7*addc : # 7？ 有待测试确定
             while mark < site and X[mark] >= 0 :
                 X[mark]=-0.01
                 Y[mark]=Y1[mark]=0
@@ -229,14 +238,20 @@ def process(micInfo):
     zflag=False #前面没有正着超过阈值的情况，可取delta_v < 0 and abs(delta_v)>thdf的距离
     print('mic:%d'%micnum)
     for i in range(snum):
+        #print(val[i])
         delta_v=val1[i]-val[i]
+        maxD=(X[int(maxsite[i])]+rid)/rate*340/2
+        miD=(X[int(maxsite[i])]+rid)/rate*340/2-0.
+        delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
+        #else:
+        #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
         if delta_v > thdz:
-            print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+rid)/rate*340/2))
+            print('%.2fm %.4f %.4f'%(maxD,delta_v, delta_v/count[i]))
             zflag=True
         elif delta_v < 0 and abs(delta_v)>thdf and zflag == False:
-            print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+rid)/rate*340/2-0.2))
+            print('%.2fm %.4f %.4f'%(miD,delta_v, delta_v/count[i]))
         else:
-            print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+rid)/rate*340/2)) 
+            print('%.2fm %.4f %.4f'%(maxD,delta_v, delta_v/count[i]))
         if mx<delta_v:
             mx=delta_v
             mxs=i
@@ -245,6 +260,7 @@ def process(micInfo):
             mis=i
     if mi >0:
         mi=0
+    
 
     return micnum,mx,mi
 
@@ -266,6 +282,8 @@ def forEveryMic(PATH1, PATH2, mics):
         micInfo.append((PATH1, PATH2, micnum))
     with Pool(len(micInfo)) as p:
         result=p.map(process, micInfo)
+    #result=process(micInfo[3])
+    
     file.writelines('<<<<<<<<\n')
     for i in range(len(result)):
         file.writelines(str(result[i][0])+'---')
@@ -273,6 +291,7 @@ def forEveryMic(PATH1, PATH2, mics):
         if result[i][1] <= thdz and (abs(result[i][2]) <= thdf or result[i][2]==2147483647): # 阈值的设定？ empty    有待检验
             count+=1
     #print(count)
+    #plt.show()
     return count
 
 
@@ -296,11 +315,11 @@ def main():
     
     figureno=0
 
-    thdz = 6           # 5.5 
-    thdf = 7           # 6.5
-    cSlice = 988       # 3.5 m
-    rid = 70           # no obstacles in 25 cm 
-    mics=[1,3,4,5,6]
+    thdz = 4           # 5.5 
+    thdf = 5          # 6.5
+    cSlice = 2117       # 2.5m; 847: 3 m; 988: 3.5m
+    rid = 282           # no obstacles in 1m;//25 cm 
+    mics=[1,3,5,6] #4
 
     PATH1='Empty'#input("empty:")
     PATH2='Barrier/barrier'#input("barrier:")
@@ -309,7 +328,7 @@ def main():
     postfix = 1
     count1 = 0
     stability_count=0
-    if count < 4: # 3
+    if count < 3: # 3
         time.sleep(4)
         # 判断环境是否稳定
         RecordAudio(PATH2, 0)
@@ -317,7 +336,7 @@ def main():
             PATH3='Barrier/barrier'+str(postfix)
             RecordAudio(PATH3, 0)
             count = forEveryMic(PATH2, PATH3, mics)
-            if (stability_count==0 and count < 4) or (stability_count==1 and count < 4): #5
+            if (stability_count==0 and count < 3) or (stability_count==1 and count < 3): #5
                 stability_count = 0
             PATH2=PATH3
             postfix+=1
@@ -325,7 +344,7 @@ def main():
         count = forEveryMic(PATH1, PATH2, mics)
     
     outcome=''
-    if count >= 4: # 3
+    if count >= 3: # 3
         outcome='empty'
         #if count >=5 :
         #    for i in range(1,7):
@@ -333,11 +352,25 @@ def main():
         #        shutil.copyfile(''.join([PATH2,'/mic',str(i),'.wav']),''.join(['empty/mic',str(i),'.wav']))
     else:
         outcome='nonempty'
+        #plt.show()
+        path_images='images/'+datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        empty_path=path_images+'-empty'
+        barrier_path=path_images+'-barrier'
+        if not os.path.exists(empty_path): 
+            os.makedirs(empty_path)
+        if not os.path.exists(barrier_path): 
+            os.makedirs(barrier_path)
+        
+        for i in range(1,7):
+            shutil.copyfile(''.join([PATH1,'/mic',str(i),'.wav']),''.join([empty_path, '/mic',str(i),'.wav']))
+            shutil.copyfile(''.join([PATH2,'/mic',str(i),'.wav']),''.join([barrier_path, '/mic',str(i),'.wav']))
         #outcome='empty'
     file.writelines(outcome+'\n')
     file.close()
     print(outcome)
-    time.sleep(2)
+    #time.sleep(2)
+
+        
     return outcome
 
 if __name__ == "__main__":

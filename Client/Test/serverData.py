@@ -31,60 +31,17 @@ def subtime(time1,time2):
     time2=datetime.datetime.strptime(time2,"%Y-%m-%d %H:%M:%S")
     return time2-time1
 
-def connect(ADDR):
-    global reset_time
-    while True:
-        try:
-            client = socket(AF_INET, SOCK_STREAM)
-            client.connect(ADDR)
-            while True:
-                print('here')
-                data = client.recv(1024)
-                print(ADDR, data.decode())   
-                if data.decode()=='connect':
-                    client.send('connectOK'.encode(encoding='utf-8'))
-                    out_r = reset.main()
-                    print(out_r)
-                    if out_r == 'OK':
-                        client.send('resetOK'.encode(encoding='utf-8'))
-                        reset_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                elif data.decode()=='detect':
-                    client.send('detectOK'.encode(encoding='utf-8'))
-                    while True:
-                        out_o = getData.main()
-                        #if out2 != 'empty' and out2 != 'nonempty':
-                        #    out2='default'
-                        print(out_o)
-                        client.send(out_o.encode(encoding='utf-8'))
-                        
-                        # reset regularly (30 minutes)
-                        now_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        if out_o == 'empty' and subtime(reset_time,now_time) >= limit :
-                            out_r1 = reset.main()
-                            if out_r1 == 'OK':
-                                reset_time = now_time
-                if not data: break
-                
-        except:
-            print('continue')
-            continue
-
-    client.settimeout(1)
-    client.setsockopt(SOL_SOCKET,SO_REUSEADDR,1) 
-    client.shutdown(2)
-    client.close() 
-
 if __name__ == '__main__':
 
     addr=(HOST,POST[0])
     #connect(addr)
     Obstacles=[]
-    reset_limit = timedelta(minutes = 10)
+    reset_limit = timedelta(minutes = 30)
     empty_count = 0
     prompt_count = 0
     Reported=False
         
-    if reset.main()=="OK":
+    if True:#reset.main()=="OK":
         logger.info("reset successfully！")
         reset_time = datetime.now()
         while True:
@@ -116,7 +73,7 @@ if __name__ == '__main__':
                     logger.info("存在障碍物已上报！")
                     Reported=True
             # 一段时间后自行reset
-            '''
+            
             now_time=datetime.now()
             if outcome == 'empty' and  now_time-reset_time >= reset_limit :
                 empty_count+=1
@@ -124,7 +81,7 @@ if __name__ == '__main__':
                     reset_time = now_time
                     empty_count = 0
                     logger.info("重置成功！")
-            '''
+            
 
 
 
