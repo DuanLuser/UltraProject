@@ -149,7 +149,7 @@ def process(micInfo):
         plt.xlabel('Distance(m)')
         plt.ylabel('Correlation')
             
-        #plt.show()
+        plt.show()
     
 
     #提取图2(The Other)中高于/低于图1(Empty)的所有点
