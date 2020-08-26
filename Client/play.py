@@ -14,12 +14,12 @@ def playaudio(choice):
         print('play '+choice+'\n')
 
 def playprompt(wav):
-    #os.popen('aplay -D "plughw:0,0" audio/'+ wav)
-    print('play' +wav)
+    os.popen('aplay -D "plughw:0,0" audio/'+ wav)
+    #print('play' +wav)
     
     
 if __name__=="__main__":
-    sys.exit(playaudio(sys.argv[1]))
+    sys.exit(playprompt('网络连接成功.wav'))#playaudio(sys.argv[1]))
 '''
 import pyaudio
 import wave

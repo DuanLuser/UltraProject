@@ -77,11 +77,11 @@ def recordaudio(path, index, time):
     return 'OK'
 
 if __name__=="__main__":
-    #ignore_stderr('Empty',2, 5)#sys.argv[1], sys.argv[2])
+    ignore_stderr('Empty',0, 5)#sys.argv[1], sys.argv[2])
     #if sys.argv[1]=='None':
     #    time.sleep(int(sys.argv[3]))
     #else:
-    ignore_stderr(sys.argv[1], sys.argv[2], sys.argv[3])#'Barrier/barrier',2,3)#
+    #ignore_stderr(sys.argv[1], sys.argv[2], sys.argv[3])#'Barrier/barrier',2,3)#
     #sys.exit(recordaudio('Empty',2))
 
 
