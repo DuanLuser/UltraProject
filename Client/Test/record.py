@@ -22,7 +22,7 @@ def ignore_stderr(path,index,time):
 def recordaudio(path, index, time):
     PATH = path
 
-    RESPEAKER_RATE = 48000
+    RESPEAKER_RATE = 44100
     RESPEAKER_CHANNELS = 8
     RESPEAKER_WIDTH = 2
     # run getDeviceInfo.py to get index

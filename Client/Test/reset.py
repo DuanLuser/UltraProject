@@ -1,7 +1,7 @@
 import os, sys, time
 import threading
 
-from play import playprompt
+#from play import playprompt
 
 def main():
     file='Empty' #sys.argv[1] #input("FileName:")

@@ -1,3 +1,4 @@
+
 import os
 import sys
 
@@ -27,7 +28,7 @@ import wave
 chunk=1024  #1024kb
 
 def play():
-    wf=wave.open("10ms.wav",'rb')
+    wf=wave.open("audio/网络连接成功.wav",'rb')
     p=pyaudio.PyAudio()
     stream=p.open(format=p.get_format_from_width(wf.getsampwidth()),
                   channels=wf.getnchannels(),

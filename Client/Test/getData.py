@@ -24,21 +24,21 @@ def FilterBandpass(wave, fs, low, high):
     ''' 应用带通滤波器 '''
     l = low/(fs/2)
     h = high/(fs/2)
-    b, a = signal.butter(8, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
+    b, a = signal.butter(4, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
     return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
 
 def averageNormalization(micnum,corr):
     '''多个周期取平均'''
     global cSlice, rid
-    distance=5280
+    distance=4851
     #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
     peaks=[]
-    i=10000
+    i=0
     first=1
     while i+distance < corr.size:
         site=np.argmax(corr[i:i+distance])+i
-        if corr[site] > 100000 :
+        if corr[site] > 10000 :
             if first >= 1:
                 peaks.append(site)
                 #print(i,micnum,site)
@@ -80,7 +80,7 @@ def process(micInfo):
     low = 18000
     high = 22000
     time = 10/1000 # 10ms
-    rate = 48000
+    rate = 44100
 
     filename1 = f'{PATH1}/mic{micnum}.wav'
     filename2 = f'{PATH2}/mic{micnum}.wav'
@@ -90,26 +90,33 @@ def process(micInfo):
     # 获得音频原始数据
     Fs, y = wavfile.read(filename1) # 空
     Fs1, y1 = wavfile.read(filename2) # 空
-
+    
     # 滤波
     fliter_y = FilterBandpass(y, Fs, low, high)
     fliter_y1 = FilterBandpass(y1, Fs1, low, high)
-
+    '''
+    if True:
+        figureno+=1
+        plt.figure(figureno)
+        plt.plot(fliter_y)
+        plt.plot(fliter_y1)
+        plt.title(str(micnum))
+    '''
     # 互相关
     corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
     corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
-    '''
+    
     if True:
         figureno+=1
         plt.figure(figureno)
         plt.plot(corr)
         plt.plot(corr1)
         plt.title(str(micnum))
-    '''
+    
     # 平均 and 归一化
     Ncorr, maxv = averageNormalization(micnum,corr)
     Ncorr1, maxv1 = averageNormalization(micnum,corr1)
-    #plt.show()
+    plt.show()
     aNcorr = Ncorr/300000            #经验值
     aNcorr1 = Ncorr1/300000
 
@@ -318,7 +325,7 @@ def main():
     thdz = 4           # 5.5 
     thdf = 5          # 6.5
     cSlice = 2117       # 2.5m; 847: 3 m; 988: 3.5m
-    rid = 282           # no obstacles in 1m;//25 cm 
+    rid = 10           # no obstacles in 1m;//25 cm 
     mics=[1,3,5,6] #4
 
     PATH1='Empty'#input("empty:")

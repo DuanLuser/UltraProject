@@ -5,11 +5,11 @@ import sys
 
 def playaudio(choice):
     if choice == 'reset':
-        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms-40.wav')
+        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms-40-441.wav')
     elif choice == 'detect-0':
-        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms-20.wav')
+        os.system('aplay -D "plughw:0,0" audio/18k-22k10ms-20-441.wav')
     elif choice == 'detect-1':
-        os.system('aplay -D "plughw:1,0" audio/18k-22k10ms-20.wav')
+        os.system('aplay -D "plughw:1,0" audio/18k-22k10ms-20-441.wav')
 
 def playprompt(wav):
     os.popen('aplay -D "plughw:0,0" audio/'+ wav)
