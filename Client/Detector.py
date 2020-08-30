@@ -71,12 +71,12 @@ class URadar:
         ''' 应用带通滤波器 '''
         l = low/(fs/2)
         h = high/(fs/2)
-        b, a = signal.butter(8, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
+        b, a = signal.butter(4, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
         return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
     def averageNormalization(self, corr):
         '''多个周期取平均'''
-        distance=5280 #24480              # t=051s;  rate=48000
+        distance=4851 #24480              # t=051s;  rate=48000
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks=[]
         i=10000
@@ -114,7 +114,7 @@ class URadar:
         low = 18000
         high = 22000
         time = 10/1000 # 10ms
-        rate = 48000
+        rate = 44100
 
         filename1 = f'{PATH1}/mic{micnum}.wav'
         filename2 = f'{PATH2}/mic{micnum}.wav'

@@ -18,41 +18,55 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import mpl_toolkits.mplot3d
 
+from playRec import TdmaPlay
 
 
 def FilterBandpass(wave, fs, low, high):
     ''' 应用带通滤波器 '''
     l = low/(fs/2)
     h = high/(fs/2)
-    b, a = signal.butter(8, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
+    b, a = signal.butter(4, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
     return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
 
 def averageNormalization(micnum,corr):
     '''多个周期取平均'''
     global cSlice, rid
-    distance=5280
+    distance=4851
     #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
     peaks=[]
-    i=10000
+    peaks1=[]
+    i=22500
     first=1
     while i+distance < corr.size:
         site=np.argmax(corr[i:i+distance])+i
-        if corr[site] > 100000 :
-            if first >= 1:
+        if corr[site] > 20000 :
+            if first % 2 :
                 peaks.append(site)
-                #print(i,micnum,site)
-            else: first+=1
+                print(i,"=",micnum,"-",site)
+            else:
+                peaks1.append(site)
+                print(i,"-",micnum,"-",site)
+        first+=1
         i+=distance
     
     cycles = []
-    #print(len(peaks))
+    cycles1= []
+    print(micnum,len(peaks))
+    print(micnum, len(peaks1))
     for p in peaks:
         c = {}
         c["PeakIndex"] = p
         c["PeakHeight"] = corr[p]
         c["Corr"] = np.abs(corr[p+rid:p+cSlice])
         cycles.append(c)
+        
+    for p in peaks1:
+        c = {}
+        c["PeakIndex"] = p
+        c["PeakHeight"] = corr[p]
+        c["Corr"] = np.abs(corr[p+rid:p+cSlice])
+        cycles1.append(c)
 
     count=0
     out = np.zeros(cSlice-rid)
@@ -63,53 +77,23 @@ def averageNormalization(micnum,corr):
             out += cycles[i]['Corr']
     length = len(cycles)-count
     out = out/length  # 平均
-    return out, np.max(out)
-
-
-
-def process(micInfo):
-    '''处理音频，获得差异值(位于背景信号之上/之下)'''
-    global cSlice, rid, thdz, thdf
-    global CCOUNT,ax,fig
-    global figureno
     
-    PATH1 = micInfo[0]
-    PATH2 = micInfo[1]
-    micnum = micInfo[2]
+    count1=0
+    out1 = np.zeros(cSlice-rid)
+    for i in range(len(cycles1)):
+        if len(cycles1[i]['Corr'])!=(cSlice-rid):
+            count1+=1
+        else:
+            out1 += cycles1[i]['Corr']
+    length1 = len(cycles1)-count1
+    out1 = out1/length1  # 平均
+    return out, out1
+
+def afterAN(Ncorr,Ncorr1, micnum):
     
-    low = 18000
-    high = 22000
-    time = 10/1000 # 10ms
-    rate = 48000
-
-    filename1 = f'{PATH1}/mic{micnum}.wav'
-    filename2 = f'{PATH2}/mic{micnum}.wav'
-    t = np.arange(0, time, 1/rate)
-    chirp = signal.chirp(t, low,time, high, method = 'linear')
-
-    # 获得音频原始数据
-    Fs, y = wavfile.read(filename1) # 空
-    Fs1, y1 = wavfile.read(filename2) # 空
-
-    # 滤波
-    fliter_y = FilterBandpass(y, Fs, low, high)
-    fliter_y1 = FilterBandpass(y1, Fs1, low, high)
-
-    # 互相关
-    corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
-    corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
-    '''
-    if True:
-        figureno+=1
-        plt.figure(figureno)
-        plt.plot(corr)
-        plt.plot(corr1)
-        plt.title(str(micnum))
-    '''
-    # 平均 and 归一化
-    Ncorr, maxv = averageNormalization(micnum,corr)
-    Ncorr1, maxv1 = averageNormalization(micnum,corr1)
-    #plt.show()
+    global cSlice, rid, thdz, thdf, figureno
+    rate = 44100
+    
     aNcorr = Ncorr/300000            #经验值
     aNcorr1 = Ncorr1/300000
 
@@ -265,6 +249,63 @@ def process(micInfo):
     return micnum,mx,mi
 
 
+def process(micInfo):
+    '''处理音频，获得差异值(位于背景信号之上/之下)'''
+    
+    global figureno
+    
+    PATH1 = micInfo[0]
+    PATH2 = micInfo[1]
+    micnum = micInfo[2]
+    
+    low = 18000
+    high = 22000
+    time = 10/1000 # 10ms
+    rate = 44100
+
+    filename1 = f'{PATH1}/mic{micnum}.wav'
+    filename2 = f'{PATH2}/mic{micnum}.wav'
+    t = np.arange(0, time, 1/rate)
+    chirp = signal.chirp(t, low,time, high, method = 'linear')
+
+    # 获得音频原始数据
+    Fs, y = wavfile.read(filename1) # 空
+    Fs1, y1 = wavfile.read(filename2) # 空
+
+    # 滤波
+    fliter_y = FilterBandpass(y, Fs, low, high)
+    fliter_y1 = FilterBandpass(y1, Fs1, low, high)
+    '''
+    if True:
+        figureno+=1
+        plt.figure(figureno)
+        plt.plot(fliter_y)
+        plt.plot(fliter_y1)
+        plt.title(str(micnum))
+    '''
+    # 互相关
+    corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
+    corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
+    
+    if True:
+        figureno+=1
+        plt.figure(figureno)
+        plt.plot(corr)
+        plt.plot(corr1)
+        plt.title(str(micnum))
+    
+    # 平均 and 归一化
+    Ncorr, Ncorr_1= averageNormalization(micnum,corr)
+    Ncorr1, Ncorr1_1 = averageNormalization(micnum,corr1)
+    plt.show()
+    micnum,mx,mi = afterAN(Ncorr,Ncorr1, micnum)
+    
+    micnum,mx,mi = afterAN(Ncorr_1,Ncorr1_1, micnum)
+    
+    return micnum,mx,mi
+    
+
+
 def forEveryMic(PATH1, PATH2, mics):
     '''对每个mic收集的数据进行process处理，并行'''
     global thdz, thdf, file
@@ -297,29 +338,29 @@ def forEveryMic(PATH1, PATH2, mics):
 
 def RecordAudio(PATH, choice):
     '''采集音频数据'''
+    global tplay
+    
     if not os.path.exists(PATH): 
         os.makedirs(PATH)
-    out=''
-    if choice==0:
-        out = os.popen('sh runforDetect.sh '+PATH+' '+'0 3'+' detect-0').read().replace('\n', '')#0,0
-    else:
-        out = os.popen('sh runforDetect.sh '+PATH+' '+'2 3'+' detect-1').read().replace('\n', '')
+    
+    out = tplay.play_and_record(PATH,3)
     print(out)
     #recordFile.recordWAV(PATH)
 
 def main():
     
-    global figureno, thdz, thdf, cSlice, rid, file
+    global figureno, thdz, thdf, cSlice, rid, file, tplay
     file=open('Data/Data.txt',mode='a+')
     file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+'\n')
+    tplay=TdmaPlay()
     
     figureno=0
 
     thdz = 4           # 5.5 
     thdf = 5          # 6.5
     cSlice = 2117       # 2.5m; 847: 3 m; 988: 3.5m
-    rid = 282           # no obstacles in 1m;//25 cm 
-    mics=[1,3,5,6] #4
+    rid = 1           # no obstacles in 1m;//25 cm 
+    mics=[1,3,4,5,6] #4
 
     PATH1='Empty'#input("empty:")
     PATH2='Barrier/barrier'#input("barrier:")

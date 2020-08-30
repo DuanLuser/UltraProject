@@ -73,7 +73,6 @@ class ICommClient:
 
     def Send(self, data: str) -> None:
         """发送消息
-
         Parameters
         ----------
         data : str
@@ -117,7 +116,6 @@ class ICommClient:
 
     def OnDisconnected(self, reason: str = ""):
         """与服务器断开时
-
         Parameters
         ----------
         reason : str, optional
@@ -136,7 +134,6 @@ class ICommClient:
 
     def OnConnectFailed(self, reason: str = ""):
         """与服务器连接失败时
-
         Parameters
         ----------
         reason : str, optional
@@ -152,7 +149,6 @@ class ICommClient:
 
     def OnMessage(self, message: str):
         """接收到服务器消息时
-
         Parameters
         ----------
         message : str

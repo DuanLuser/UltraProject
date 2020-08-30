@@ -17,5 +17,3 @@ class ObstacleStatus:
         self.IsExist=True
         self.IsReport=False
         self.FirstAppear=datetime.now()
-        
-    

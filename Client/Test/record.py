@@ -3,6 +3,7 @@ import sys
 import wave
 import numpy as np
 import os
+import time
 import contextlib
 
 
@@ -22,7 +23,7 @@ def ignore_stderr(path,index,time):
 def recordaudio(path, index, time):
     PATH = path
 
-    RESPEAKER_RATE = 48000
+    RESPEAKER_RATE = 44100
     RESPEAKER_CHANNELS = 8
     RESPEAKER_WIDTH = 2
     # run getDeviceInfo.py to get index
@@ -76,8 +77,9 @@ def recordaudio(path, index, time):
     return 'OK'
 
 if __name__=="__main__":
-    #ignore_stderr('Empty',0,3)#sys.argv[1], sys.argv[2])
-    ignore_stderr(sys.argv[1], sys.argv[2], sys.argv[3])
+    #ignore_stderr('Empty',1, 5)#sys.argv[1], sys.argv[2])
+    #if sys.argv[1]=='None':
+    #    time.sleep(int(sys.argv[3]))
+    #else:
+    ignore_stderr(sys.argv[1], sys.argv[2], sys.argv[3])#'Barrier/barrier',2,3)#
     #sys.exit(recordaudio('Empty',2))
-
-

@@ -81,10 +81,3 @@ if __name__ == '__main__':
                     reset_time = now_time
                     empty_count = 0
                     logger.info("重置成功！")
-            
-
-
-
-
-
-

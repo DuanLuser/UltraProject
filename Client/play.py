@@ -14,18 +14,16 @@ def playaudio(choice):
         print('play '+choice+'\n')
 
 def playprompt(wav):
-    os.popen('aplay -D "plughw:0,0" audio/'+ wav)
-    #print('play' +wav)
+    #os.popen('aplay -D "plughw:0,0" audio/'+ wav)
+    print('play' +wav)
     
     
 if __name__=="__main__":
-    sys.exit(playprompt('网络连接成功.wav'))#playaudio(sys.argv[1]))
+    sys.exit(playaudio(sys.argv[1]))
 '''
 import pyaudio
 import wave
-
 chunk=1024  #1024kb
-
 def play():
     wf=wave.open("10ms.wav",'rb')
     p=pyaudio.PyAudio()
@@ -34,13 +32,13 @@ def play():
                   rate=wf.getframerate(),
                   output=True)
  
-    data = wf.readframes(chunk)  # 读取数据
+    data = wf.readframes(chunk)  # ��ȡ����
     print(data)
-    while len(data)>0:  # 播放  
+    while len(data)>0:  # ����  
         stream.write(data)
         data = wf.readframes(chunk)
         print(data)
-    stream.stop_stream()   # 停止数据流
+    stream.stop_stream()   # ֹͣ������
     stream.close()
     p.terminate()
     

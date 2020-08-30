@@ -25,6 +25,3 @@ for line in all_lines:
     ax.plot(np.arange(0,len(array)),COUNT,array)
     ax.xaxis.set_ticks_position('top') #将x轴的位置设置在顶部
     count+=0.05
-    
-    
-    
