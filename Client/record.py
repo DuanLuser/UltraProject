@@ -77,7 +77,7 @@ def recordaudio(path, index, time):
     return 'OK'
 
 if __name__=="__main__":
-    #ignore_stderr('Empty',2, 5)#sys.argv[1], sys.argv[2])
+    #ignore_stderr('Empty',1, 5)#sys.argv[1], sys.argv[2])
     #if sys.argv[1]=='None':
     #    time.sleep(int(sys.argv[3]))
     #else:

@@ -1,5 +1,4 @@
 import os, sys, time
-from playRec import TdmaPlay
 
 #from play import playprompt
 
@@ -10,9 +9,7 @@ def main():
         os.makedirs(file)
     #playprompt("网络连接成功.wav")
     #time.sleep(2)
-    tplay=TdmaPlay()
-    out = tplay.play_and_record(file,5)
-     
+    out = os.popen('python3 playRec.py '+file +' 5').read().replace('\n', '')  
     print(out)
     
     return out

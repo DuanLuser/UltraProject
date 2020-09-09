@@ -16,6 +16,7 @@ import logging
 import logzero
 
 import warnings
+from playRec import playprompt
 warnings.filterwarnings("ignore")
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -35,11 +36,12 @@ class URadar:
     prompt: str = 'None'
 
     figureno=0
-    mics=[1,3,5,6]
+    mics=[1,3,4,5,6]
     stability_count=2
     process_result=[]
-    nor_val=300000           #经验值
+    nor_val=400000           #经验值
     reset_order=False
+    #tplay=TdmaPlay()
     
     _PATH1='Empty'
     _PATH2='Barrier/barrier'
@@ -60,7 +62,10 @@ class URadar:
         logger.info("正在重置...")
         if not os.path.exists(self._PATH1):
             os.makedirs(self._PATH1)
-        out = os.popen('sh runforDetect.sh '+self._PATH1 +' 0 5'+' reset').read().replace('\n', '')# 0 0
+            
+        #out = self.tplay.play_and_record(self._PATH1,5)
+        #out = play_and_record(self._PATH1,5)
+        out = os.popen('python3 playRec.py '+self._PATH1 +' 5').read().replace('\n', '')
         if out=="OK":
             logger.info("重置成功！")
         else:
@@ -71,7 +76,7 @@ class URadar:
         ''' 应用带通滤波器 '''
         l = low/(fs/2)
         h = high/(fs/2)
-        b, a = signal.butter(4, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
+        b, a = signal.butter(5, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
         return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
     def averageNormalization(self, corr):
@@ -79,23 +84,29 @@ class URadar:
         distance=4851 #24480              # t=051s;  rate=48000
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks=[]
-        i=10000
+        cycles = []
+        peaks1=[]
+        cycles1= []
+        i=22500
         first=1
         while i+distance < corr.size:
             site=np.argmax(corr[i:i+distance])+i
             if corr[site] > 100000 :
-                peaks.append(site)
+                c = {}
+                c["PeakIndex"] = site
+                c["PeakHeight"] = corr[site]
+                c["Corr"] = np.abs(corr[site+self.rid:site+self.cSlice])
+                if first % 2 :
+                    peaks.append(site)
+                    cycles.append(c)
+                else:
+                    peaks1.append(site)
+                    cycles1.append(c)
+            first+=1
             i+=distance
     
-        cycles = []
-        #print(len(peaks))
-        for p in peaks:
-            c = {}
-            c[("PeakIndex")] = p
-            c[("PeakHeight")] = corr[p]
-            c[("Corr")] = np.abs(corr[p+self.rid:p+self.cSlice])
-            cycles.append(c)
-
+        #print(micnum,len(peaks))
+        #print(micnum, len(peaks1))
         count=0
         out = np.zeros(self.cSlice-self.rid)
         for i in range(len(cycles)):
@@ -105,37 +116,22 @@ class URadar:
                 out += cycles[i][('Corr')]
         length = len(cycles)-count
         out = out/length  # 平均
-        return out, np.max(out)
-
-    def process(self, PATH1, PATH2, micnum):
-        global ax, fig, CCOUNT
-        '''处理音频，获得差异值(位于背景信号之上/之下)'''
         
-        low = 18000
-        high = 22000
-        time = 10/1000 # 10ms
+        count1=0
+        out1 = np.zeros(self.cSlice-self.rid)
+        for i in range(len(cycles1)):
+            if len(cycles1[i][('Corr')])!=(self.cSlice-self.rid):
+                count1+=1
+            else:
+                out1 += cycles1[i][('Corr')]
+        length1 = len(cycles1)-count1
+        out1 = out1/length1  # 平均
+        return out, out1
+
+    def afterAN(self, Ncorr, Ncorr1, micnum):
+        global ax, fig, CCOUNT
         rate = 44100
 
-        filename1 = f'{PATH1}/mic{micnum}.wav'
-        filename2 = f'{PATH2}/mic{micnum}.wav'
-        t = np.arange(0, time, 1/rate)
-        chirp = signal.chirp(t, low,time, high, method = 'linear')
-
-        # 获得音频原始数据
-        Fs, y = wavfile.read(filename1) # 空
-        Fs1, y1 = wavfile.read(filename2) # 空
-
-        # 滤波
-        fliter_y = self.FilterBandpass(y, Fs, low, high)
-        fliter_y1 = self.FilterBandpass(y1, Fs1, low, high)
-
-        # 互相关
-        corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
-        corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
-    
-        # 平均 and 归一化
-        Ncorr, maxv = self.averageNormalization(corr)
-        Ncorr1, maxv1 = self.averageNormalization(corr1)
         aNcorr = Ncorr/self.nor_val            
         aNcorr1 = Ncorr1/self.nor_val
 
@@ -144,7 +140,7 @@ class URadar:
         y=aNcorr[x]
         x1=signal.argrelextrema(aNcorr1, np.greater)[0]
         y1=aNcorr1[x1]
-
+        
         #for safety
         if x.size <=0 or x1.size <= 0:
             return micnum,0,0
@@ -158,22 +154,20 @@ class URadar:
         func1=interpolate.interp1d(x1,y1, kind="cubic")
         y_smooth1=func1(x_new)
         #print('Type',type(y_smooth1))
+        
         if micnum==1:
             for d in y_smooth1:
                 self.Data1.write(("%.5f"%d)+',')
             self.Data1.write('\n')
         elif micnum==3:
-            #Data3.append(y_smooth1)
             for d in y_smooth1:
                 self.Data3.write(("%.5f"%d)+',')
             self.Data3.write('\n')
         elif micnum==5:
-            #Data5.append(y_smooth1)
             for d in y_smooth1:
                 self.Data5.write(("%.5f"%d)+',')
             self.Data5.write('\n')
         elif micnum==6:
-            #Data6.append(y_smooth1)
             for d in y_smooth1:
                 self.Data6.write(("%.5f"%d)+',')
             self.Data6.write('\n')
@@ -283,11 +277,46 @@ class URadar:
             if delta_v<mi:
                 mi=delta_v
                 mis=i
-        if mi >0:
+        if mi >0 :
             mi=0
         
         self.process_result.append((micnum,mx,mi))
         return micnum,mx,mi
+
+    def process(self, PATH1, PATH2, micnum):
+        
+        '''处理音频，获得差异值(位于背景信号之上/之下)'''
+        
+        low = 18000
+        high = 22000
+        time = 10/1000 # 10ms
+        rate = 44100
+
+        filename1 = f'{PATH1}/mic{micnum}.wav'
+        filename2 = f'{PATH2}/mic{micnum}.wav'
+        t = np.arange(0, time, 1/rate)
+        chirp = signal.chirp(t, low,time, high, method = 'linear')
+
+        # 获得音频原始数据
+        Fs, y = wavfile.read(filename1) # 空
+        Fs1, y1 = wavfile.read(filename2) # 空
+
+        # 滤波
+        fliter_y = self.FilterBandpass(y, Fs, low, high)
+        fliter_y1 = self.FilterBandpass(y1, Fs1, low, high)
+
+        # 互相关
+        corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
+        corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
+    
+        # 平均 and 归一化
+        Ncorr, Ncorr_1= self.averageNormalization(corr)
+        Ncorr1, Ncorr1_1 = self.averageNormalization(corr1)
+
+        micnum,mx,mi = self.afterAN(Ncorr,Ncorr1, micnum)
+        micnum,mx1,mi1 = self.afterAN(Ncorr_1,Ncorr1_1, micnum)
+        
+        self.process_result.append([micnum,max(mx,mx1),min(mi,mi1)])
 
 
     def forEveryMic(self, PATH1, PATH2, mics):
@@ -306,9 +335,10 @@ class URadar:
         for i in range(len(result)):
             self.file.writelines(str(result[i][0])+'---')
             self.file.writelines('mx:'+('%.2f'%result[i][1])+',mi:-'+('%.2f'%abs(result[i][2]))+'\n')
-            if result[i][1] <= self.thdz and (abs(result[i][2]) <= self.thdf or result[i][2]==2147483647): # 阈值的设定？ empty    有待检验
+            if result[i][1] <= self.thdz and abs(result[i][2]) <= self.thdf: # 阈值的设定？ empty    有待检验
                 count+=1
         self.process_result.clear()
+        #print(count)
         return count
 
 
@@ -317,41 +347,45 @@ class URadar:
         if not os.path.exists(PATH): 
             os.makedirs(PATH)
         out=''
-        if self.reset_order == True:
+        if self.reset_order:
             self.reset()
             self.reset_order=False
-        #if self.prompt != 'None':
-            #print('prompt',self.prompt)
-            #out = os.popen('sh runforDetect.sh '+'None'+' 0 3 '+self.prompt).read().replace('\n', '')
-            #self.prompt='None'
             
-        if choice==0:
-            out = os.popen('sh runforDetect.sh '+PATH+' '+'0 3'+' detect-0').read().replace('\n', '')#0,0
-        else:
-            out = os.popen('sh runforDetect.sh '+PATH+' '+'2 3'+' detect-1').read().replace('\n', '')
-        print(out)
-        #recordFile.recordWAV(PATH)
+        #存在提示音要占据音频端口的情况，先播放提示音
+        if self.prompt != 'None':
+            #playprompt(self.prompt)
+            print('prompt',self.prompt)
+            self.prompt='None'
+        
+        #out = self.tplay.play_and_record(PATH,3)
+        #out = play_and_record(PATH,3)
+        out = os.popen('python3 playRec.py '+PATH +' 3').read().replace('\n', '')
+        #print(out)
+        
 
     def detect(self):
         
+        # 记录数据
         self.file=open('Data.txt',mode='a+')
-        
+        self.file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+'\n')
         self.Data1=open('MIC/Mic1.txt',mode='a+')
         self.Data3=open('MIC/Mic3.txt',mode='a+')
         self.Data5=open('MIC/Mic5.txt',mode='a+')
         self.Data6=open('MIC/Mic6.txt',mode='a+')
         
-        self.file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+'\n')
         self.RecordAudio(self._PATH2, 0)
         count = self.forEveryMic(self._PATH1, self._PATH2, self.mics)
+        # 
         if count < 3: # 3
-            time.sleep(4)
+            logger.info("检测到环境波动...")
+            time.sleep(3)
             # 判断环境是否稳定
             scount=0
             postfix = 1
             PATH2=self._PATH2
             self.RecordAudio(PATH2, 0)
             while scount < self.stability_count:
+                logger.info("持续检测中...")
                 PATH3=self._PATH2+str(postfix)
                 self.RecordAudio(PATH3, 0)
                 count = self.forEveryMic(PATH2, PATH3, self.mics)
@@ -362,7 +396,7 @@ class URadar:
                 scount+=1
             count = self.forEveryMic(self._PATH1, PATH2, self.mics)
     
-        if count >= 3: # 3
+        if count >= 3: # 4
             self.outcome='empty'
             #if count >=5 :
             #    for i in range(1,7):
@@ -378,7 +412,7 @@ class URadar:
         self.Data3.close()
         self.Data5.close()
         self.Data6.close()
-        time.sleep(1)
+        time.sleep(2)
         
         return self.outcome
     

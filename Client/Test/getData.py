@@ -25,7 +25,7 @@ def FilterBandpass(wave, fs, low, high):
     ''' 应用带通滤波器 '''
     l = low/(fs/2)
     h = high/(fs/2)
-    b, a = signal.butter(4, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
+    b, a = signal.butter(5, [l, h], 'bandpass')  # 配置滤波器 8 表示滤波器的阶数
     return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
 
@@ -34,59 +34,51 @@ def averageNormalization(micnum,corr):
     global cSlice, rid
     distance=4851
     #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
-    peaks=[]
-    peaks1=[]
-    i=22500
+    peaks_lists = [[]for i in range(2)]
+    cycles_lists = [[]for i in range(2)]
+
+    i=22050             # 44100     0.5s
     first=1
     while i+distance < corr.size:
         site=np.argmax(corr[i:i+distance])+i
-        if corr[site] > 20000 :
+        if corr[site] > 100000 :
+            c = {}
+            c["PeakIndex"] = site
+            c["PeakHeight"] = corr[site]
+            c["Corr"] = np.abs(corr[site+rid:site+cSlice])
             if first % 2 :
-                peaks.append(site)
-                print(i,"=",micnum,"-",site)
+                peaks_lists[0].append(site)
+                cycles_lists[0].append(c)
             else:
-                peaks1.append(site)
-                print(i,"-",micnum,"-",site)
+                peaks_lists[1].append(site)
+                cycles_lists[1].append(c)
         first+=1
         i+=distance
     
-    cycles = []
-    cycles1= []
-    print(micnum,len(peaks))
-    print(micnum, len(peaks1))
-    for p in peaks:
-        c = {}
-        c["PeakIndex"] = p
-        c["PeakHeight"] = corr[p]
-        c["Corr"] = np.abs(corr[p+rid:p+cSlice])
-        cycles.append(c)
-        
-    for p in peaks1:
-        c = {}
-        c["PeakIndex"] = p
-        c["PeakHeight"] = corr[p]
-        c["Corr"] = np.abs(corr[p+rid:p+cSlice])
-        cycles1.append(c)
-
-    count=0
+    #print(micnum,len(peaks_lists[0]))
+    #print(micnum, len(peaks_lists[1]))
     out = np.zeros(cSlice-rid)
-    for i in range(len(cycles)):
-        if len(cycles[i]['Corr'])!=(cSlice-rid):
-            count+=1
-        else:
-            out += cycles[i]['Corr']
-    length = len(cycles)-count
-    out = out/length  # 平均
-    
-    count1=0
     out1 = np.zeros(cSlice-rid)
-    for i in range(len(cycles1)):
-        if len(cycles1[i]['Corr'])!=(cSlice-rid):
-            count1+=1
+    for i in range(2):
+        count=0
+        for i1 in range(len(cycles_lists[i])):
+            if i == 0:
+                if len(cycles_lists[i][i1][('Corr')])!=(cSlice-rid):
+                    count+=1
+                else:
+                    out += cycles_lists[i][i1][('Corr')]
+            else:
+                if len(cycles_lists[i][i1][('Corr')])!=(cSlice-rid):
+                    count+=1
+                else:
+                    out1 += cycles_lists[i][i1][('Corr')]
+        if i == 0:
+            length = len(cycles_lists[i])-count
+            out = out/length  # 平均
         else:
-            out1 += cycles1[i]['Corr']
-    length1 = len(cycles1)-count1
-    out1 = out1/length1  # 平均
+            length = len(cycles_lists[i])-count
+            out1 = out1/length  # 平均
+    
     return out, out1
 
 def afterAN(Ncorr,Ncorr1, micnum):
@@ -94,8 +86,8 @@ def afterAN(Ncorr,Ncorr1, micnum):
     global cSlice, rid, thdz, thdf, figureno
     rate = 44100
     
-    aNcorr = Ncorr/300000            #经验值
-    aNcorr1 = Ncorr1/300000
+    aNcorr = Ncorr/500000            #经验值
+    aNcorr1 = Ncorr1/500000
 
     #获取极值点    
     x=signal.argrelextrema(aNcorr, np.greater)[0]
@@ -110,6 +102,7 @@ def afterAN(Ncorr,Ncorr1, micnum):
     #统一坐标轴，插值平滑
     x_min=max(x[0],x1[0])
     x_max=min(x[x.size-1],x1[x1.size-1])
+    print(micnum, x_min, x_max)
     x_new = np.linspace(x_min,x_max,cSlice*2) #!!!cSlice的大小会影响每个区域点的个数
     func=interpolate.interp1d(x,y, kind="cubic")
     y_smooth=func(x_new)
@@ -133,7 +126,7 @@ def afterAN(Ncorr,Ncorr1, micnum):
         plt.xlabel('Distance(m)')
         plt.ylabel('Correlation')
             
-        plt.show()
+        #plt.show()
     
 
     #提取图2(The Other)中高于/低于图1(Empty)的所有点
@@ -242,6 +235,7 @@ def afterAN(Ncorr,Ncorr1, micnum):
         if delta_v<mi:
             mi=delta_v
             mis=i
+    plt.show()
     if mi >0:
         mi=0
     
@@ -253,6 +247,7 @@ def process(micInfo):
     '''处理音频，获得差异值(位于背景信号之上/之下)'''
     
     global figureno
+    
     
     PATH1 = micInfo[0]
     PATH2 = micInfo[1]
@@ -286,18 +281,18 @@ def process(micInfo):
     # 互相关
     corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
     corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
-    
+    '''
     if True:
         figureno+=1
         plt.figure(figureno)
         plt.plot(corr)
         plt.plot(corr1)
         plt.title(str(micnum))
-    
+    '''
     # 平均 and 归一化
     Ncorr, Ncorr_1= averageNormalization(micnum,corr)
     Ncorr1, Ncorr1_1 = averageNormalization(micnum,corr1)
-    plt.show()
+    #plt.show()
     micnum,mx,mi = afterAN(Ncorr,Ncorr1, micnum)
     
     micnum,mx,mi = afterAN(Ncorr_1,Ncorr1_1, micnum)
@@ -329,7 +324,7 @@ def forEveryMic(PATH1, PATH2, mics):
     for i in range(len(result)):
         file.writelines(str(result[i][0])+'---')
         file.writelines('mx:'+('%.2f'%result[i][1])+',mi:-'+('%.2f'%abs(result[i][2]))+'\n')
-        if result[i][1] <= thdz and (abs(result[i][2]) <= thdf or result[i][2]==2147483647): # 阈值的设定？ empty    有待检验
+        if result[i][1] <= thdz and abs(result[i][2]) <= thdf: # 阈值的设定？ empty    有待检验
             count+=1
     #print(count)
     #plt.show()
@@ -343,8 +338,8 @@ def RecordAudio(PATH, choice):
     if not os.path.exists(PATH): 
         os.makedirs(PATH)
     
-    out = tplay.play_and_record(PATH,3)
-    print(out)
+    #out = os.popen('python3 playRec.py '+PATH +' 3').read().replace('\n', '')
+    #print(out)
     #recordFile.recordWAV(PATH)
 
 def main():
@@ -356,10 +351,10 @@ def main():
     
     figureno=0
 
-    thdz = 4           # 5.5 
-    thdf = 5          # 6.5
+    thdz = 5           # 5.5 
+    thdf = 6           # 6.5
     cSlice = 2117       # 2.5m; 847: 3 m; 988: 3.5m
-    rid = 1           # no obstacles in 1m;//25 cm 
+    rid = 260           # no obstacles in 1m;//25 cm 
     mics=[1,3,4,5,6] #4
 
     PATH1='Empty'#input("empty:")

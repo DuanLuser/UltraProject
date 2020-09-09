@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 '''
-@File    :   comm.py
+@File    :   Server.py
 @Time    :   2020/07/28 16:34:50
 @Author  :   Runze Tang 
 @Version :   1.0
@@ -10,7 +10,8 @@
 @Desc    :   None
 '''
 
-
+import os
+import base64
 import logzero
 import logging
 import json
@@ -21,8 +22,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Thread, Event, Lock
 
 from Detector import URadar
-from play import playprompt
 from ObstaclesStatus import ObstacleStatus
+from camera import Picture
+from playRec import playprompt
 
 logger = logzero.setup_logger("Comm")
 
@@ -35,7 +37,7 @@ class ICommClient:
     server_url: str # 服务器地址
     device_id: str  # 设备id
     server_connect_timeout: int = 5     # 尝试连接服务器的超时时间(秒)
-    server_connect_interval: int = 10 # 尝试连接服务器的时间间隔(秒)
+    server_connect_interval: int = 10   # 尝试连接服务器的时间间隔(秒)
     server_ping_timeout: int = 5        # ping服务器的超时时间(秒)
     server_ping_maxfailure: int = 3     # ping服务器最大失败次数
     server_ping_interval: int = 10      # ping服务器的时间间隔(秒)
@@ -58,13 +60,23 @@ class ICommClient:
         # 启动连接定时器，并立即执行一次
         if not self._scheduler.running:
             self._scheduler.start()
-
+        
+        self._scheduler.remove_all_jobs()
         self._scheduler.add_job(
             self.Connect,
             'interval', 
             seconds=self.server_connect_interval, 
             id="Connect", 
             next_run_time=datetime.now())
+        
+    def Shutdown(self) -> None:
+        """停止客户端，断开连接，不再重连
+        """
+        try:
+            self.Close()
+        except:
+            pass
+        self._scheduler.shutdown()
 
     def Connect(self) -> None:
         """连接服务器
@@ -84,6 +96,17 @@ class ICommClient:
         """关闭客户端
         """
         raise NotImplementedError
+    
+    def SendJson(self, data) -> None:
+        """发送Json消息
+
+        Parameters
+        ----------
+        data : Any
+            任意可转换为Json的结构
+        """
+        self.Send(json.dumps(data))
+
 
     ############事件处理#############
     def OnConnected(self):
@@ -91,13 +114,13 @@ class ICommClient:
         """
         self._is_connected = True
         logger.info(f"连接到服务器成功: {self.server_url}")
-        if self.firstConnect==False:
-            playprompt("网络连接成功.wav")
-            time.sleep(2)
+        if not self.firstConnect:
+            #playprompt("网络连接成功.wav")
+            print("网络连接成功.wav")
             self.firstConnect=True
             Thread(target=self.DetectReport).start() # 连接成功后，启动检测
         else:
-            #print('网络连接成功.wav')
+            print('网络连接成功.wav')
             self.radar.prompt="网络连接成功.wav"
 
         # 移除连接定时器
@@ -122,7 +145,12 @@ class ICommClient:
             原因描述, by default ""
         """
         self._is_connected = False
-        logger.info(f"与服务器连接断开({reason})，{self.server_ping_interval}秒后重试")
+        logger.info(f"与服务器连接断开({reason})，{self.server_connect_interval}秒后重试")
+        # 连接成功后断开
+        if self.firstConnect:
+            print('网络连接失败，正在重新连接.wav')
+            self.radar.prompt="网络连接失败，正在重新连接.wav"
+        
         # 移除ping定时器
         self._scheduler.remove_job("CheckAlive")
         # 添加连接定时器
@@ -140,12 +168,9 @@ class ICommClient:
             原因描述, by default ""
         """
         logger.info(f"无法连接到服务器({reason})，{self.server_connect_interval}s后重试")
-        if self.firstConnect==False:
-            playprompt("网络连接失败，正在重新连接.wav")
-            time.sleep(3) 
-        else:
-            print('网络连接失败，正在重新连接.wav')
-            self.radar.prompt="网络连接失败，正在重新连接.wav"
+        if not self.firstConnect:
+            #playprompt("网络连接失败，正在重新连接.wav")
+            print("网络连接失败，正在重新连接.wav")
 
     def OnMessage(self, message: str):
         """接收到服务器消息时
@@ -195,13 +220,12 @@ class ICommClient:
 
     #############雷达检测############
     def DetectReport(self):
-        
         reset_limit = timedelta(minutes = 60)
         empty_count = 0
         prompt_count = 0
         Reported=False
         
-        if True:#self.radar.reset()=="OK":
+        if self.radar.reset()=="OK":
             reset_time = datetime.now()
             while True:
                 outcome = self.radar.detect()
@@ -214,21 +238,24 @@ class ICommClient:
                         Reported=False
                     #else: 后续判断障碍物是否改变
                     if prompt_count < 3: # 连续提示次数
-                        playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
-                        time.sleep(5)
+                        #playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
+                        print("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         prompt_count+=1  
                 if outcome=="empty" and len(self.Obstacles)!=0:
                     self.Obstacles.clear()
-                    playprompt("障碍物已移除，谢谢配合.wav")
-                    time.sleep(3)
+                    #playprompt("障碍物已移除，谢谢配合.wav")
+                    print("障碍物已移除，谢谢配合.wav")
                     if Reported==True:
-                        self.Send(json.dumps({"cmd": "removed", "data": ["0"]}))
+                        self.Send(json.dumps({"cmd": "log", "level": "REMOVED","message":"障碍物已移除"}))
                         logger.info("障碍物移除已上报！")
                     
                 now_time=datetime.now()
                 for ob in self.Obstacles:    
                     if ob.IsReport==False:#now_time-ob.FirstAppear > ob.ReportLimit and ob.IsReport==False:
-                        self.Send(json.dumps(ob.DetectedInfo))
+                        # 拍照上传
+                        picture=Picture()
+                        image_base64=picture.takePhoto()
+                        self.Send(json.dumps({"cmd": "log", "level": "DETECTED","message":"检测到障碍物！","image": image_base64}))
                         ob.IsReport=True
                         logger.info("存在障碍物已上报！")
                         Reported=True
@@ -278,7 +305,7 @@ class WebsocketClient(ICommClient):
         # 启动客户端，开始连接
         Thread(target=self.__ws_client.run_forever, daemon=True).start()
         # 设置连接服务器的超时时间
-        self.__ws_client.sock.settimeout(5)
+        self.__ws_client.sock.settimeout(self.server_connect_timeout)
 
     def Send(self, data: str):
         self.__ws_client.send(data)
@@ -298,6 +325,6 @@ if __name__ == "__main__":
     time.sleep(5)
     ws = WebsocketClient()
     ws.server_url = "ws://47.100.88.177:2714"
-    ws.device_id = "3"
+    ws.device_id = "2"
     ws.Start()
     while True: continue

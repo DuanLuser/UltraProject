@@ -1,5 +1,5 @@
-import os
-import sys
+import os, sys
+import time
 import wave
 
 import pyaudio
@@ -9,6 +9,17 @@ import sounddevice as sd
 import numpy as np
 
 from record import ignore_stderr
+
+def play_wav_on_index(audio_data, index):
+    """
+    Play an audio file given as the result of `load_sound_file_into_memory`
+    :param audio_data: A two-dimensional NumPy array
+    :param index:
+    :return: None, returns when the data has all been consumed
+    """
+    sd.default.device[1] = index
+    sd.play(audio_data, samplerate=44100, blocking=True)
+    #sd.wait()
 
 class TdmaPlay:
     
@@ -21,7 +32,7 @@ class TdmaPlay:
     def __init__(self):
         self.expected_channels=[["seeed-8mic-voicecard",1], #record
             ["USB Audio Device",0],
-            ["upmix",2]#play
+            #["upmix",2]#play
             ]
 
     def load_sound_file_into_memory(self, path):
@@ -47,21 +58,10 @@ class TdmaPlay:
         for item in self.expected_channels:
             if item[0] in info["name"]:
                 item[1]=index
-                if "seeed" not in item[0]:
+                if "seeed-8mic" not in item[0]:
                     self.sound_card_indices.append(index)
                 return index
         return False
- 
- 
-    def play_wav_on_index(self, audio_data, index):
-        """
-        Play an audio file given as the result of `load_sound_file_into_memory`
-        :param audio_data: A two-dimensional NumPy array
-        :param index:
-        :return: None, returns when the data has all been consumed
-        """
-        sd.default.device[1] = index
-        sd.play(audio_data, blocking=True)
         
     def good_filepath(self, path):
         """
@@ -71,63 +71,78 @@ class TdmaPlay:
         """
         return str(path).endswith(".wav") and (not str(path).startswith("."))
     
-    def play_and_record(self, path, second):
+    def playrec(self, Path, Second):
         cwd = ""
-        if second==5:
+        
+        if Second=="5":
             cwd="audio/reset/"
-        if second==3:
+        if Second=="3":
             cwd="audio/detect/"
+        self.sound_card_indices.clear()
+        
         sound_file_paths = [
             os.path.join(cwd, path) for path in sorted(filter(lambda path: self.good_filepath(path), os.listdir(cwd)))]
         
-        print("Discovered the following .wav files:", sound_file_paths)
+        #print("Discovered the following .wav files:", sound_file_paths)
  
         files = [self.load_sound_file_into_memory(path) for path in sound_file_paths]
  
-        print("Files loaded into memory, Looking for USB devices.")
+        #print("Files loaded into memory, Looking for devices.")
         #print(sd.query_devices())
  
         list(filter(lambda x: x is not False,map(self.get_device_number,[index_info for index_info in enumerate(sd.query_devices())])))
  
-        print("Discovered the following sound devices", self.sound_card_indices)
+        #print("Discovered the following sound devices", self.sound_card_indices)
         #print(self.expected_channels)
         running = True
  
         if not len(self.sound_card_indices) > 0:
             running = False
-            print("No audio devices found, stopping")
+            #print("No audio devices found, stopping")
  
         if not len(files) > 0:
             running = False
-            print("No sound files found, stopping")
-        
-        t = None
-        if running:
-            t=threading.Thread(target=ignore_stderr, args=[path, self.expected_channels[0][1], second])
-            t.start()
+            #print("No sound files found, stopping")
         
         if running:
-            print("Playing files")
-            threads = [threading.Thread(target=self.play_wav_on_index, args=[file_path, index])
+            #print("Playing files")
+            threads = [threading.Thread(target=play_wav_on_index, args=[file_path, index])
                    for file_path, index  in zip(files, self.sound_card_indices)]
- 
+            
+            # playing
             for thread in threads:
                 thread.start()
+            # recording
+            t=threading.Thread(target=ignore_stderr, args=[Path, self.expected_channels[0][1], Second])
+            t.start()
+            
             for thread, device_index in zip(threads, self.sound_card_indices):
-                print("Waiting for device", device_index, "to finish")
+                #print("Waiting for device", device_index, "to finish")
                 thread.join()
             t.join()
             
             return "OK"
-                
- 
-if __name__ == "__main__":
-    
-    tplay=TdmaPlay()
-    tplay.play_and_record('Empty',5)
-    
- 
-    
- 
-    
 
+# 播放提示音
+def playprompt(wav):
+    #os.popen('aplay -D "plughw:2,0" audio/prompt/'+ wav)
+    if wav == "网络连接成功.wav":
+        time.sleep(2)
+    elif wav == "网络连接失败，正在重新连接.wav":
+        time.sleep(3)
+    elif wav == "障碍物已移除，谢谢配合.wav":
+        time.sleep(3)
+    elif wav == "请注意，消防通道禁止阻塞，请立即移除障碍物.wav":
+        time.sleep(5)
+            
+'''
+def play_and_record(path, second): # 线程报错
+    tplay=TdmaPlay()
+    out = tplay.playrec(path, second)
+    return out
+'''
+
+if __name__ == "__main__":
+    tplay=TdmaPlay()
+    sys.exit(tplay.playrec(sys.argv[1], sys.argv[2]))
+    
