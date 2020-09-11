@@ -1,12 +1,10 @@
 import os, sys
-import time
-import wave
+import time, wave
 
 import pyaudio
 import soundfile
 import threading
 import sounddevice as sd
-import numpy as np
 
 from record import ignore_stderr
 
