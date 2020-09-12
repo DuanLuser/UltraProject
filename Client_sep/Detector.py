@@ -33,10 +33,6 @@ class URadar:
     _PATH2='Barrier/barrier'
     
     file=None
-    Data1=None
-    Data3=None
-    Data5=None
-    Data6=None
     
     def __init__(self, thdz=5, thdf=6) -> None:
         self._thdz=thdz
@@ -57,13 +53,13 @@ class URadar:
         return out
     
 
-    def forEveryMic(self, PATH1, PATH2, mics):
+    def forEveryMic(self, PATH1, PATH2):
         '''对每个mic收集的数据进行process处理，并行'''
         count = 0
         
         Threads=[]
-        for i in range(len(mics)):
-            t = Thread(target=self._micData[i].process, args=(PATH1, PATH2, mics[i],))
+        for i in range(len(self._mics)):
+            t = Thread(target=self._micData[i].process, args=(PATH1, PATH2, self._mics[i],))
             t.start()
             Threads.append(t)
         for t in Threads:
@@ -72,7 +68,7 @@ class URadar:
         sEmpty=np.zeros(self._micData[0]._cSlice*2)
         sOther=np.zeros(self._micData[0]._cSlice*2)
         self.file.writelines('<<<<<<<<\n')
-        for i in range(len(mics)):
+        for i in range(len(self._mics)):
             self.file.writelines(str(self._micData[i]._process_result[0])+'---')
             self.file.writelines('mx:'+('%.2f'%self._micData[i]._process_result[1])+',mi:-'+('%.2f'%abs(self._micData[i]._process_result[2]))+'\n')
             if self._micData[i]._process_result[1] <= self._thdz and abs(self._micData[i]._process_result[0]) <= self._thdf: # 阈值的设定？ empty    有待检验
@@ -118,7 +114,7 @@ class URadar:
         #print(count)    
         return count
 
-    def RecordAudio(self, PATH, choice):
+    def RecordAudio(self, PATH):
         '''采集音频数据'''
         if not os.path.exists(PATH): 
             os.makedirs(PATH)
@@ -142,13 +138,9 @@ class URadar:
         # 记录数据
         self.file=open('MIC/Data.txt',mode='a+')
         self.file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+'\n')
-        self.Data1=open('MIC/Mic1.txt',mode='a+')
-        self.Data3=open('MIC/Mic3.txt',mode='a+')
-        self.Data5=open('MIC/Mic5.txt',mode='a+')
-        self.Data6=open('MIC/Mic6.txt',mode='a+')
         
-        self.RecordAudio(self._PATH2, 0)
-        count = self.forEveryMic(self._PATH1, self._PATH2, self._mics)
+        self.RecordAudio(self._PATH2)
+        count = self.forEveryMic(self._PATH1, self._PATH2)
         # 
         if count < 3: # 3
             logger.info("检测到环境波动...")
@@ -157,18 +149,18 @@ class URadar:
             scount=0
             postfix = 1
             PATH2=self._PATH2
-            self.RecordAudio(PATH2, 0)
+            self.RecordAudio(PATH2)
             while scount < self._stability_count:
                 logger.info("持续检测中...")
                 PATH3=self._PATH2+str(postfix)
-                self.RecordAudio(PATH3, 0)
-                count = self.forEveryMic(PATH2, PATH3, self._mics)
+                self.RecordAudio(PATH3)
+                count = self.forEveryMic(PATH2, PATH3)
                 if (scount==0 and count < 3) or (scount==1 and count < 3): #5
                     scount = 0
                 PATH2=PATH3
                 postfix+=1
                 scount+=1
-            count = self.forEveryMic(self._PATH1, PATH2, self._mics)
+            count = self.forEveryMic(self._PATH1, PATH2)
     
         if count >= 3: # 4
             self._outcome='empty'
@@ -182,10 +174,6 @@ class URadar:
         logger.info(f"检测结果：{self._outcome}")
         self.file.writelines(self._outcome+'\n')
         self.file.close()
-        self.Data1.close()
-        self.Data3.close()
-        self.Data5.close()
-        self.Data6.close()
         time.sleep(2)
         
         return self._outcome
@@ -205,5 +193,5 @@ if __name__ == "__main__":
     reset_choice=input('reset_or_not:')
     if reset_choice=='1':
         Radar.reset()
-    while True:
-        Radar.detect()
+    #while True:
+    Radar.detect()
