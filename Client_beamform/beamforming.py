@@ -81,6 +81,7 @@ class URadar:
 
         # 获得音频原始数据
         result = []
+        label=[]
         for cta in self._cta:
             for rfa in self._rfa:
                 delta_sample = []
@@ -89,12 +90,35 @@ class URadar:
                     d = self._micd * math.sin(cta/180 * math.pi)* math.cos(rfa1/180*math.pi)
                     sample=round(d/vel*rate)
                     delta_sample.append(sample)
-                print('angle:', cta, rfa) 
-                mx, mi = self._micData.process(chirp, emic_fs_y, bmic_fs_y, delta_sample)
+                print('angle:', cta, rfa)
+                label.append(str(cta)+"-"+str(rfa))
+                mx, mi = self._micData.process(chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa)
                 print("mx:",mx, "mi:",mi)
                 result.append([cta,rfa, mx,mi])
                 if cta == 0: break
+        label = ['0', '60', '120', '180', '240', '300' ]
+        for cta in self._cta:
+            plt.figure()
+            plt.ylim(0,1)
+            cta_x_y = None
+            if cta == 0:
+                cta_x_y = self._micData._x_y_0      
+            if cta == 30:
+                cta_x_y = self._micData._x_y_30
+            if cta == 60:
+                cta_x_y = self._micData._x_y_60
+            if cta == 90:
+                cta_x_y = self._micData._x_y_90
+            for x_y in cta_x_y:
+                plt.plot(x_y[0], x_y[1], linewidth=1)
+            plt.legend(label, loc =0) 
+            plt.title(''.join(['cta', '-', str(cta)]))
+            plt.xlabel('Distance(m)')
+            plt.ylabel('Correlation')
+            
+        #plt.show()
         
+        plt.show()
         outcome = 'empty'
         for res in result:
             if res[2] > self._thdz or abs(res[3]) > self._thdf:
@@ -120,7 +144,7 @@ class URadar:
             
         out=''
         
-        out = os.popen('python3 playRec.py '+PATH +' 3').read().replace('\n', '')
+        #out = os.popen('python3 playRec.py '+PATH +' 3').read().replace('\n', '')
         #print(out)
         
     def detect(self):
@@ -139,20 +163,20 @@ class URadar:
                 logger.info("持续检测中...")
                 PATH3=self._PATH2+str(postfix)
                 self.RecordAudio(PATH3)
-                outcome = self.beamform_detect(self._PATH1, self._PATH2)
+                outcome = self.beamform_detect(PATH2, PATH3)
                 if outcome == "nonempty":
                     scount = 0
                 PATH2=PATH3
                 postfix+=1
                 scount+=1
-            outcome = self.beamform_detect(self._PATH1, self._PATH2)
+            outcome = self.beamform_detect(self._PATH1, PATH2)
         logger.info(f"检测结果：{outcome}")
         return outcome
 
 if __name__ == "__main__":
     
     bfObject = URadar()
-    choice = int(input("reset_or_not:"))
+    choice = 0 #int(input("reset_or_not:"))
     if choice == 1:
         bfObject.reset()
     bfObject.detect()

@@ -19,7 +19,10 @@ class MicData:
     _rid: int                # 70           # no obstacles in 25 cm 
     _thdz: int
     _thdf: int
-    _x_y: list
+    _x_y_0: list
+    _x_y_30: list
+    _x_y_60: list
+    _x_y_90: list
     
     _rate = 44100
     _low = 18000
@@ -30,9 +33,12 @@ class MicData:
     def __init__(self, thdz: int, thdf: int) -> None:
         self._cSlice = 100
         self._rid = -100
-        self._x_y=[]
         self._thdz = thdz
         self._thdf = thdf
+        self._x_y_0 = []
+        self._x_y_30 = []
+        self._x_y_60 = []
+        self._x_y_90 = []
         
 
     def FilterBandpass(self, wave, fs):
@@ -93,7 +99,7 @@ class MicData:
                 out1 = out1/length  # 平均
         return out, out1
 
-    def afterAN(self, Ncorr, Ncorr1):
+    def afterAN(self, Ncorr, Ncorr1, cta, rfa):
 
         aNcorr = Ncorr/self._nor_val            
         aNcorr1 = Ncorr1/self._nor_val
@@ -118,6 +124,16 @@ class MicData:
         y_smooth1=func1(x_new)
         #print('Type',type(y_smooth1))
         
+        #self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
+        if cta == 0:
+            self._x_y_0.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+        if cta == 30:
+            self._x_y_30.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+        if cta == 60:
+            self._x_y_60.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+        if cta == 90:
+            self._x_y_90.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+        '''
         plt.figure()
         label=['Empty','The other']
         #plt.plot(x,y,'o')
@@ -126,17 +142,14 @@ class MicData:
         #plt.plot(x1,y1,'*')
         plt.plot((x_new+self._rid)/self._rate*340/2, y_smooth1,c='red',linewidth=1)
         plt.legend(label, loc =0) 
-        plt.title(''.join(['mic','All']))
+        plt.title(''.join([str(cta),'-', str(rfa)]))
         #plt.title('Comparison')
         #plt.title('Envelope Detection')
         plt.xlabel('Distance(m)')
         plt.ylabel('Correlation')
             
-        plt.show()
-        
-        
-        self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
-        self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+        #plt.show()
+        '''
         
         #提取图2(The Other)中高于/低于图1(Empty)的所有点
         X=np.zeros(self._cSlice*2)
@@ -247,7 +260,7 @@ class MicData:
 
         return mx,mi
 
-    def process(self, chirp, emic_fs_y, bmic_fs_y, delta_sample):
+    def process(self, chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa):
         '''处理音频'''
 
         min_delta = min(delta_sample)
@@ -300,8 +313,8 @@ class MicData:
         eNcorr, eNcorr1 = self.averageNormalization(sum_ecorr)
         bNcorr, bNcorr1 = self.averageNormalization(sum_bcorr)
         
-        mx,mi = self.afterAN(eNcorr,bNcorr)
-        mx1,mi1 = self.afterAN(eNcorr1,bNcorr1)
+        mx,mi = self.afterAN(eNcorr,bNcorr, cta, rfa)
+        mx1,mi1 = self.afterAN(eNcorr1,bNcorr1, cta, rfa)
         
         return max(mx,mx1), min(mi,mi1)
 

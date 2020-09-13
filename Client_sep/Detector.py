@@ -69,9 +69,10 @@ class URadar:
         sOther=np.zeros(self._micData[0]._cSlice*2)
         self.file.writelines('<<<<<<<<\n')
         for i in range(len(self._mics)):
+            print(self._micData[i]._process_result[0], self._micData[i]._process_result[1],self._micData[i]._process_result[2])
             self.file.writelines(str(self._micData[i]._process_result[0])+'---')
             self.file.writelines('mx:'+('%.2f'%self._micData[i]._process_result[1])+',mi:-'+('%.2f'%abs(self._micData[i]._process_result[2]))+'\n')
-            if self._micData[i]._process_result[1] <= self._thdz and abs(self._micData[i]._process_result[0]) <= self._thdf: # 阈值的设定？ empty    有待检验
+            if self._micData[i]._process_result[1] <= self._thdz and abs(self._micData[i]._process_result[2]) <= self._thdf: # 阈值的设定？ empty    有待检验
                 count+=1
             self._micData[i]._process_result.clear()
             

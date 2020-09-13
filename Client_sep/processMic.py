@@ -31,8 +31,8 @@ class MicData:
     _nor_val = 500000        # 经验值
 
     def __init__(self, micnum: int, thdz: int, thdf: int) -> None:
-        self._cSlice = 2117
-        self._rid = 0
+        self._cSlice = 100
+        self._rid = -100
         self._process_result=[]
         self._x_y=[]
         self._micnum = micnum
@@ -212,7 +212,7 @@ class MicData:
         mis=-1
         mi=2147483647
         zflag=False #前面没有正着超过阈值的情况，可取delta_v < 0 and abs(delta_v)>thdf的距离
-        #print('mic:%d'%micnum)
+        print('mic:%d'%micnum)
         for i in range(snum):
             delta_v=val1[i]-val[i]
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
@@ -221,12 +221,12 @@ class MicData:
             #else:
             #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
             if delta_v > self._thdz:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
+                print('%.2fm %.4f %.4f'%(maxD, delta_v, delta_v/count[i]))
                 zflag=True
-            #elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2-0.2))
-            #else:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2)) 
+            elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
+                print('%.2fm %.4f %.4f'%(maxD, delta_v, delta_v/count[i]))
+            else:
+                print('%.2fm %.4f %.4f'%(maxD, delta_v, delta_v/count[i]))
             if mx<delta_v:
                 mx=delta_v
                 mxs=i
