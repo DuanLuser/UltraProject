@@ -19,16 +19,18 @@ class MicData:
     _rid: int                # 70           # no obstacles in 25 cm 
     _thdz: int
     _thdf: int
-    _x_y_0: list
-    _x_y_30: list
-    _x_y_60: list
-    _x_y_90: list
     
     _rate = 44100
     _low = 18000
     _high = 22000
     _distance = 4851         # t=0.11s;  rate=44100
     _nor_val = 2000000        # 经验值
+    
+    # record data for plotting figure
+    _x_y_0: list
+    _x_y_30: list
+    _x_y_60: list
+    _x_y_90: list
 
     def __init__(self, thdz: int, thdf: int) -> None:
         self._cSlice = 100
@@ -42,14 +44,14 @@ class MicData:
         
 
     def FilterBandpass(self, wave, fs):
-        ''' 应用带通滤波器 '''
+        """ 应用带通滤波器 """
         l = self._low/(fs/2)
         h = self._high/(fs/2)
-        b, a = signal.butter(5, [l, h], 'bandpass')  # 配置滤波器 5/8 表示滤波器的阶数
+        b, a = signal.butter(5, [l, h], "bandpass")  # 配置滤波器 5/8 表示滤波器的阶数
         return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
     def averageNormalization(self, corr):
-        '''多个周期取平均'''
+        """多个周期取平均"""
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
@@ -82,15 +84,15 @@ class MicData:
             count=0
             for i1 in range(len(cycles_lists[i])):
                 if i == 0:
-                    if len(cycles_lists[i][i1][('Corr')])!=(self._cSlice-self._rid):
+                    if len(cycles_lists[i][i1][("Corr")])!=(self._cSlice-self._rid):
                         count+=1
                     else:
-                        out += cycles_lists[i][i1][('Corr')]
+                        out += cycles_lists[i][i1][("Corr")]
                 else:
-                    if len(cycles_lists[i][i1][('Corr')])!=(self._cSlice-self._rid):
+                    if len(cycles_lists[i][i1][("Corr")])!=(self._cSlice-self._rid):
                         count+=1
                     else:
-                        out1 += cycles_lists[i][i1][('Corr')]
+                        out1 += cycles_lists[i][i1][("Corr")]
             if i == 0:
                 length = len(cycles_lists[i])-count
                 out = out/length  # 平均
@@ -122,7 +124,7 @@ class MicData:
         y_smooth=func(x_new)
         func1=interpolate.interp1d(x1,y1, kind="cubic")
         y_smooth1=func1(x_new)
-        #print('Type',type(y_smooth1))
+        #print("Type",type(y_smooth1))
         
         #self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
         if cta == 0:
@@ -133,23 +135,23 @@ class MicData:
             self._x_y_60.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
         if cta == 90:
             self._x_y_90.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
-        '''
+        """
         plt.figure()
-        label=['Empty','The other']
-        #plt.plot(x,y,'o')
+        label=["Empty","The other"]
+        #plt.plot(x,y,"o")
         plt.ylim(0,1)
         plt.plot((x_new+self._rid)/self._rate*340/2, y_smooth,linewidth=1)
-        #plt.plot(x1,y1,'*')
-        plt.plot((x_new+self._rid)/self._rate*340/2, y_smooth1,c='red',linewidth=1)
+        #plt.plot(x1,y1,"*")
+        plt.plot((x_new+self._rid)/self._rate*340/2, y_smooth1,c="red",linewidth=1)
         plt.legend(label, loc =0) 
-        plt.title(''.join([str(cta),'-', str(rfa)]))
-        #plt.title('Comparison')
-        #plt.title('Envelope Detection')
-        plt.xlabel('Distance(m)')
-        plt.ylabel('Correlation')
+        plt.title("".join([str(cta),"-", str(rfa)]))
+        #plt.title("Comparison")
+        #plt.title("Envelope Detection")
+        plt.xlabel("Distance(m)")
+        plt.ylabel("Correlation")
             
         #plt.show()
-        '''
+        """
         
         #提取图2(The Other)中高于/低于图1(Empty)的所有点
         X=np.zeros(self._cSlice*2)
@@ -243,12 +245,12 @@ class MicData:
             #else:
             #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
             if delta_v > self._thdz:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
+                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
                 zflag=True
             #elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2-0.2))
+                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2-0.2))
             #else:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2)) 
+                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2)) 
             if mx<delta_v:
                 mx=delta_v
                 mxs=i
@@ -261,7 +263,7 @@ class MicData:
         return mx,mi
 
     def process(self, chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa):
-        '''处理音频'''
+        """处理音频"""
 
         min_delta = min(delta_sample)
         #print(delta_sample, min_delta)
@@ -296,19 +298,19 @@ class MicData:
             sum_bfy += aligned_bfy[i]
       
         # 互相关
-        sum_ecorr = np.abs(np.correlate(sum_efy, chirp, mode='full'))
-        sum_bcorr = np.abs(np.correlate(sum_bfy, chirp, mode='full'))
+        sum_ecorr = np.abs(np.correlate(sum_efy, chirp, mode="full"))
+        sum_bcorr = np.abs(np.correlate(sum_bfy, chirp, mode="full"))
         
-        '''
+        """
         plt.figure()
-        label=[''.join(['mic','empty']),''.join(['mic','other'])]
+        label=["".join(["mic","empty"]),"".join(["mic","other"])]
         plt.plot(sum_ecorr)
         plt.plot(sum_bcorr)
         #plt.plot(sum_corr)
         plt.legend(label, loc =0) 
-        plt.title('comparsion')
+        plt.title("comparsion")
         plt.show()
-        '''
+        """
         # 平均 and 归一化
         eNcorr, eNcorr1 = self.averageNormalization(sum_ecorr)
         bNcorr, bNcorr1 = self.averageNormalization(sum_bcorr)

@@ -41,14 +41,14 @@ class MicData:
         
 
     def FilterBandpass(self, wave, fs):
-        ''' 应用带通滤波器 '''
+        """ 应用带通滤波器 """
         l = self._low/(fs/2)
         h = self._high/(fs/2)
-        b, a = signal.butter(5, [l, h], 'bandpass')  # 配置滤波器 5/8 表示滤波器的阶数
+        b, a = signal.butter(5, [l, h], "bandpass")  # 配置滤波器 5/8 表示滤波器的阶数
         return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
     def averageNormalization(self, corr):
-        '''多个周期取平均'''
+        """多个周期取平均"""
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
@@ -67,11 +67,11 @@ class MicData:
                 if first % 2 :
                     peaks_lists[0].append(site)
                     cycles_lists[0].append(c)
-                    #print(self._micnum, '-', site)
+                    #print(self._micnum, "-", site)
                 else:
                     peaks_lists[1].append(site)
                     cycles_lists[1].append(c)
-                    #print(self._micnum, '=', site)
+                    #print(self._micnum, "=", site)
                 if first == 1 :
                     first_detect = True
             if first_detect :
@@ -86,15 +86,15 @@ class MicData:
             count = 0
             for i1 in range(len(cycles_lists[i])):
                 if i == 0:
-                    if len(cycles_lists[i][i1][('Corr')])!=(self._cSlice-self._rid):
+                    if len(cycles_lists[i][i1][("Corr")])!=(self._cSlice-self._rid):
                         count += 1
                     else:
-                        out += cycles_lists[i][i1][('Corr')]
+                        out += cycles_lists[i][i1][("Corr")]
                 else:
-                    if len(cycles_lists[i][i1][('Corr')])!=(self._cSlice-self._rid):
+                    if len(cycles_lists[i][i1][("Corr")])!=(self._cSlice-self._rid):
                         count += 1
                     else:
-                        out1 += cycles_lists[i][i1][('Corr')]
+                        out1 += cycles_lists[i][i1][("Corr")]
             if i == 0:
                 length = len(cycles_lists[i])-count
                 out = out/length  # 平均
@@ -126,7 +126,7 @@ class MicData:
         y_smooth=func(x_new)
         func1=interpolate.interp1d(x1,y1, kind="cubic")
         y_smooth1=func1(x_new)
-        #print('Type',type(y_smooth1))
+        #print("Type",type(y_smooth1))
         
         self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
         self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
@@ -215,7 +215,7 @@ class MicData:
         mis=-1
         mi=2147483647
         zflag=False #前面没有正着超过阈值的情况，可取delta_v < 0 and abs(delta_v)>thdf的距离
-        #print('mic:%d'%micnum)
+        #print("mic:%d"%micnum)
         for i in range(snum):
             delta_v=val1[i]-val[i]
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
@@ -224,12 +224,12 @@ class MicData:
             #else:
             #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
             if delta_v > self._thdz:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
+                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
                 zflag=True
             #elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2-0.2))
+                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2-0.2))
             #else:
-                #print('%d: %f %f %fm'%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2)) 
+                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2)) 
             if mx<delta_v:
                 mx=delta_v
                 mxs=i
@@ -242,12 +242,12 @@ class MicData:
         return micnum,mx,mi
 
     def process(self, PATH1, PATH2, micnum):
-        '''处理音频，获得差异值(位于背景信号之上/之下)'''
+        """处理音频，获得差异值(位于背景信号之上/之下)"""
 
-        filename1 = f'{PATH1}/mic{micnum}.wav'
-        filename2 = f'{PATH2}/mic{micnum}.wav'
+        filename1 = f"{PATH1}/mic{micnum}.wav"
+        filename2 = f"{PATH2}/mic{micnum}.wav"
         t = np.arange(0, self._dur_time, 1/self._rate)
-        chirp = signal.chirp(t, self._low,self._dur_time, self._high, method = 'linear')
+        chirp = signal.chirp(t, self._low,self._dur_time, self._high, method = "linear")
 
         # 获得音频原始数据
         Fs, y = wavfile.read(filename1) # 空
@@ -258,15 +258,15 @@ class MicData:
         fliter_y1 = self.FilterBandpass(y1, Fs1)
 
         # 互相关
-        corr = np.abs(np.correlate(fliter_y, chirp, mode='full'))
-        corr1 = np.abs(np.correlate(fliter_y1, chirp, mode='full'))
+        corr = np.abs(np.correlate(fliter_y, chirp, mode="full"))
+        corr1 = np.abs(np.correlate(fliter_y1, chirp, mode="full"))
         
-        '''
+        """
         plt.figure()
         plt.plot(corr)
         plt.plot(corr1)
         plt.show()
-        '''
+        """
         
         # 平均 and 归一化
         Ncorr, Ncorr_1= self.averageNormalization(corr)

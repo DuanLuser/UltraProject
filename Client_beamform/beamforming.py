@@ -24,7 +24,7 @@ import mpl_toolkits.mplot3d
 logger = logzero.setup_logger("client", level=logging.INFO)
 
 class URadar:
-    '''封装类'''
+    """封装类"""
     
     _thdz: float             #7.5           # 5.5 
     _thdf: float             #8.5           # 6.5
@@ -35,13 +35,14 @@ class URadar:
     _mics = [1,3,4,5,6]
     _micd = 4.6/100                #  m
     
-    _PATH1 = 'Empty'
-    _PATH2 = 'Barrier/barrier'
+    _PATH1 = "Empty"
+    _PATH2 = "Barrier/barrier"
     _stability_count = 2
     _reset_order = False
-    _prompt: str = 'None'
+    _prompt: str = "None"
+    _file = None
     
-    def __init__(self, thdz=5, thdf=6) -> None:
+    def __init__(self, thdz=3, thdf=4) -> None:
         self._thdz = thdz
         self._thdf = thdf
         self._micData = MicData(thdz, thdf)
@@ -51,7 +52,7 @@ class URadar:
         if not os.path.exists(self._PATH1):
             os.makedirs(self._PATH1)
             
-        out = os.popen('python3 playRec.py '+self._PATH1 +' 5').read().replace('\n', '')
+        out = os.popen("python3 playRec.py "+self._PATH1 +" 5").read().replace("\n", "")
         if out=="OK":
             logger.info("重置成功！")
         else:
@@ -59,7 +60,7 @@ class URadar:
         return out
 
     def beamform_detect(self, EPath, BPath):
-        ''' '''
+        """ """
         rate = 44100
         low = 18000
         high = 22000
@@ -69,15 +70,15 @@ class URadar:
         emic_fs_y = []
         bmic_fs_y = []
         for micnum in self._mics:
-            filename=f'{EPath}/mic{micnum}.wav'
-            filename1=f'{BPath}/mic{micnum}.wav'
+            filename=f"{EPath}/mic{micnum}.wav"
+            filename1=f"{BPath}/mic{micnum}.wav"
             eFs, ey = wavfile.read(filename)
             bFs, by = wavfile.read(filename1)
             emic_fs_y.append([micnum, eFs, ey])
             bmic_fs_y.append([micnum, bFs, by])
         
         t = np.arange(0, dur_time, 1/rate)
-        chirp = signal.chirp(t, low, dur_time, high, method = 'linear')
+        chirp = signal.chirp(t, low, dur_time, high, method = "linear")
 
         # 获得音频原始数据
         result = []
@@ -90,13 +91,14 @@ class URadar:
                     d = self._micd * math.sin(cta/180 * math.pi)* math.cos(rfa1/180*math.pi)
                     sample=round(d/vel*rate)
                     delta_sample.append(sample)
-                print('angle:', cta, rfa)
+                print("angle:", cta, rfa)
                 label.append(str(cta)+"-"+str(rfa))
                 mx, mi = self._micData.process(chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa)
                 print("mx:",mx, "mi:",mi)
+                self._file.writelines(str(cta)+"-"+str(rfa)+"->"+"mx:"+("%.2f"%mx)+",mi:-"+("%.2f"%abs(mi))+"\n")
                 result.append([cta,rfa, mx,mi])
                 if cta == 0: break
-        label = ['0', '60', '120', '180', '240', '300' ]
+        label = ["0", "60", "120", "180", "240", "300" ]
         for cta in self._cta:
             plt.figure()
             plt.ylim(0,1)
@@ -112,24 +114,24 @@ class URadar:
             for x_y in cta_x_y:
                 plt.plot(x_y[0], x_y[1], linewidth=1)
             plt.legend(label, loc =0) 
-            plt.title(''.join(['cta', '-', str(cta)]))
-            plt.xlabel('Distance(m)')
-            plt.ylabel('Correlation')
+            plt.title("".join(["cta", "-", str(cta)]))
+            plt.xlabel("Distance(m)")
+            plt.ylabel("Correlation")
             
         #plt.show()
         
         plt.show()
-        outcome = 'empty'
+        outcome = "empty"
         for res in result:
             if res[2] > self._thdz or abs(res[3]) > self._thdf:
-                outcome = 'nonempty'
+                outcome = "nonempty"
         
         print(outcome)
         return outcome
         
 
     def RecordAudio(self, PATH):
-        '''采集音频数据'''
+        """采集音频数据"""
         if not os.path.exists(PATH): 
             os.makedirs(PATH)
         
@@ -137,17 +139,20 @@ class URadar:
             self.reset()
             self._reset_order=False
         
-        if self._prompt != 'None':
+        if self._prompt != "None":
             #playprompt(self._prompt)
-            print('prompt',self._prompt)
-            self._prompt='None'
+            print("prompt",self._prompt)
+            self._prompt="None"
             
-        out=''
+        out=""
         
-        #out = os.popen('python3 playRec.py '+PATH +' 3').read().replace('\n', '')
+        #out = os.popen("python3 playRec.py "+PATH +" 3").read().replace("\n", "")
         #print(out)
         
     def detect(self):
+        
+        self._file=open("MIC/Data.txt",mode="a+")
+        self._file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+"\n")
         
         self.RecordAudio(self._PATH2)
         outcome = self.beamform_detect(self._PATH1, self._PATH2)
@@ -171,6 +176,9 @@ class URadar:
                 scount+=1
             outcome = self.beamform_detect(self._PATH1, PATH2)
         logger.info(f"检测结果：{outcome}")
+        
+        self._file.writelines(outcome+"\n")
+        self._file.close()
         return outcome
 
 if __name__ == "__main__":
