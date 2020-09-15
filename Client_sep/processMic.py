@@ -31,7 +31,7 @@ class MicData:
     _nor_val = 500000        # 经验值
 
     def __init__(self, micnum: int, thdz: int, thdf: int) -> None:
-        self._cSlice = 100
+        self._cSlice = 500
         self._rid = -100
         self._process_result=[]
         self._x_y=[]
@@ -58,7 +58,7 @@ class MicData:
         first_detect = False
         while i+self._distance < corr.size:
             site=np.argmax(corr[i:i+self._distance])+i
-            if corr[site] > 100000 :
+            if corr[site] > 10000 :
                 c = {}
                 c["PeakIndex"] = site
                 c["PeakHeight"] = corr[site]
@@ -113,6 +113,7 @@ class MicData:
         
         #for safety
         if x.size <=0 or x1.size <= 0:
+            print('here')
             return micnum,0,0
     
         #统一坐标轴，插值平滑
@@ -216,10 +217,8 @@ class MicData:
         for i in range(snum):
             delta_v=val1[i]-val[i]
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
-            #if val[i]>10:
-            delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
-            #else:
-            #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
+            #delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
+
             if delta_v > self._thdz:
                 print("%.2fm %.4f %.4f"%(maxD, delta_v, delta_v/count[i]))
                 zflag=True
@@ -257,7 +256,14 @@ class MicData:
         # 互相关
         corr = np.abs(np.correlate(fliter_y, chirp, mode="full"))
         corr1 = np.abs(np.correlate(fliter_y1, chirp, mode="full"))
-    
+        '''
+        plt.figure()
+        #plt.plot(x,y,"o")
+        plt.plot(corr)
+        #plt.plot(x1,y1,"*")
+        plt.plot(corr1)
+        plt.show()
+        '''
         # 平均 and 归一化
         Ncorr, Ncorr_1= self.averageNormalization(corr)
         Ncorr1, Ncorr1_1 = self.averageNormalization(corr1)

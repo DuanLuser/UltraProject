@@ -26,6 +26,7 @@ class MicData:
     _distance = 4851         # t=0.11s;  rate=44100
     _nor_val = 2000000        # 经验值
     
+    _result: list
     # record data for plotting figure
     _x_y_0: list
     _x_y_30: list
@@ -33,10 +34,11 @@ class MicData:
     _x_y_90: list
 
     def __init__(self, thdz: int, thdf: int) -> None:
-        self._cSlice = 100
+        self._cSlice = 500
         self._rid = -100
         self._thdz = thdz
         self._thdf = thdf
+        self._result = []
         self._x_y_0 = []
         self._x_y_30 = []
         self._x_y_60 = []
@@ -56,8 +58,8 @@ class MicData:
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
 
-        i=22050             # 44100     0.5s
-        first=1
+        i = 0             # 22050 44100     0.5s
+        first = 1
         first_detect = False
         while i+self._distance < corr.size:
             site=np.argmax(corr[i:i+self._distance])+i
@@ -128,14 +130,15 @@ class MicData:
         
         #self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
         if cta == 0:
-            self._x_y_0.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+            self._x_y_0.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
         if cta == 30:
-            self._x_y_30.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+            self._x_y_30.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
         if cta == 60:
-            self._x_y_60.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
+            self._x_y_60.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
         if cta == 90:
-            self._x_y_90.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
-        """
+            self._x_y_90.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
+        
+        
         plt.figure()
         label=["Empty","The other"]
         #plt.plot(x,y,"o")
@@ -149,9 +152,7 @@ class MicData:
         #plt.title("Envelope Detection")
         plt.xlabel("Distance(m)")
         plt.ylabel("Correlation")
-            
         #plt.show()
-        """
         
         #提取图2(The Other)中高于/低于图1(Empty)的所有点
         X=np.zeros(self._cSlice*2)
@@ -240,10 +241,8 @@ class MicData:
         for i in range(snum):
             delta_v=val1[i]-val[i]
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
-            #if val[i]>10:
-            delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
-            #else:
-            #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
+            #delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
+            
             if delta_v > self._thdz:
                 #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
                 zflag=True
@@ -261,12 +260,19 @@ class MicData:
             mi=0
 
         return mx,mi
+    
+    def upinterpolate(self, y):
+        x = np.arange(len(y))
+        x_new = np.linspace(x[0],x[len(x)-1],len(y)*2) #!!!_cSlice的大小会影响每个区域点的个数
+        func=interpolate.interp1d(x,y, kind="cubic")
+        y_smooth=func(x_new)
+        return y_smooth
 
     def process(self, chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa):
         """处理音频"""
 
         min_delta = min(delta_sample)
-        #print(delta_sample, min_delta)
+        print(delta_sample, min_delta)
         
         fliter_ey = []
         fliter_by = []
@@ -275,6 +281,7 @@ class MicData:
             bdata = bmic_fs_y[i]
             eres = self.FilterBandpass(edata[2], edata[1])
             bres = self.FilterBandpass(bdata[2], bdata[1])
+            
             fliter_ey.append(eres)
             fliter_by.append(bres)
             
@@ -289,7 +296,7 @@ class MicData:
             end2 = length_by + start
             aligned_efy.append(fliter_ey[i][start:end1])
             aligned_bfy.append(fliter_by[i][start:end2])
-            #print("aligned", len(aligned_efy[i]))
+            #print("aligned", len(aligned_efy[i]), len(aligned_bfy[i]))
         
         sum_efy = aligned_efy[0]
         sum_bfy = aligned_bfy[0]
@@ -318,6 +325,7 @@ class MicData:
         mx,mi = self.afterAN(eNcorr,bNcorr, cta, rfa)
         mx1,mi1 = self.afterAN(eNcorr1,bNcorr1, cta, rfa)
         
+        #self._result.append([cta, rfa, max(mx,mx1), min(mi,mi1)])
         return max(mx,mx1), min(mi,mi1)
 
         

@@ -32,7 +32,7 @@ class URadar:
     _cta = [0, 30, 60, 90]   #
     _rfa = [0, 60, 120, 180, 240, 300] # 相对于mic4
     
-    _mics = [1,3,4,5,6]
+    _mics = [1, 3, 4, 5, 6]
     _micd = 4.6/100                #  m
     
     _PATH1 = "Empty"
@@ -42,7 +42,7 @@ class URadar:
     _prompt: str = "None"
     _file = None
     
-    def __init__(self, thdz=3, thdf=4) -> None:
+    def __init__(self, thdz=1.5, thdf=1.5) -> None:
         self._thdz = thdz
         self._thdf = thdf
         self._micData = MicData(thdz, thdf)
@@ -82,22 +82,34 @@ class URadar:
 
         # 获得音频原始数据
         result = []
-        label=[]
+        Threads=[]
         for cta in self._cta:
             for rfa in self._rfa:
                 delta_sample = []
                 for micn in self._mics:
                     rfa1 = rfa + 60*(micn-1)
                     d = self._micd * math.sin(cta/180 * math.pi)* math.cos(rfa1/180*math.pi)
-                    sample=round(d/vel*rate)
-                    delta_sample.append(sample)
+                    sample = d*rate/vel
+                    #print(sample)
+                    delta_sample.append(round(sample))
+                #print(delta_sample)
+               
                 print("angle:", cta, rfa)
-                label.append(str(cta)+"-"+str(rfa))
                 mx, mi = self._micData.process(chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa)
                 print("mx:",mx, "mi:",mi)
                 self._file.writelines(str(cta)+"-"+str(rfa)+"->"+"mx:"+("%.2f"%mx)+",mi:-"+("%.2f"%abs(mi))+"\n")
                 result.append([cta,rfa, mx,mi])
                 if cta == 0: break
+                #t = Thread(target=self._micData.process, args=(chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa,))
+                #Threads.append(t)
+                
+        ''' 
+        for t in Threads:
+            t.start()
+        for t in Threads:
+            t.join()
+        '''
+        
         label = ["0", "60", "120", "180", "240", "300" ]
         for cta in self._cta:
             plt.figure()
@@ -111,8 +123,10 @@ class URadar:
                 cta_x_y = self._micData._x_y_60
             if cta == 90:
                 cta_x_y = self._micData._x_y_90
+                
             for x_y in cta_x_y:
                 plt.plot(x_y[0], x_y[1], linewidth=1)
+
             plt.legend(label, loc =0) 
             plt.title("".join(["cta", "-", str(cta)]))
             plt.xlabel("Distance(m)")
@@ -122,12 +136,14 @@ class URadar:
         
         plt.show()
         outcome = "empty"
-        for res in result:
+        for res in self._micData._result:
+            print(res[0], res[1], res[2], res[3])
             if res[2] > self._thdz or abs(res[3]) > self._thdf:
                 outcome = "nonempty"
         
         print(outcome)
         return outcome
+        
         
 
     def RecordAudio(self, PATH):
@@ -143,8 +159,6 @@ class URadar:
             #playprompt(self._prompt)
             print("prompt",self._prompt)
             self._prompt="None"
-            
-        out=""
         
         #out = os.popen("python3 playRec.py "+PATH +" 3").read().replace("\n", "")
         #print(out)
@@ -184,8 +198,9 @@ class URadar:
 if __name__ == "__main__":
     
     bfObject = URadar()
-    choice = 0 #int(input("reset_or_not:"))
+    choice = int(input("reset_or_not:"))
     if choice == 1:
         bfObject.reset()
-    bfObject.detect()
+    while True:
+        bfObject.detect()
     

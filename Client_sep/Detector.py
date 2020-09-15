@@ -77,22 +77,24 @@ class URadar:
             self._micData[i]._process_result.clear()
             
             for k in range(1):
-                plt.figure()
-                label=["Empty","The other"]
-                #plt.plot(x,y,"o")
-                plt.ylim(0,1)
-                plt.plot(self._micData[i]._x_y[k*2][0],self._micData[i]._x_y[k*2][1], linewidth=1)
-                #plt.plot(x1,y1,"*")
-                plt.plot(self._micData[i]._x_y[k*2+1][0],self._micData[i]._x_y[k*2+1][1], c="red",linewidth=1)
-                plt.legend(label, loc =0) 
-                plt.title("".join(["mic",str(self._micData[i]._micnum)]))
-                #plt.title("Comparison")
-                #plt.title("Envelope Detection")
-                plt.xlabel("Distance(m)")
-                plt.ylabel("Correlation")
-                if k==0 :
-                    sEmpty+=self._micData[i]._x_y[0][1]
-                    sOther+=self._micData[i]._x_y[1][1]
+                if len(self._micData[i]._x_y) and len(self._micData[i]._x_y[k*2]) and len(self._micData[i]._x_y[k*2+1]):
+                    plt.figure()
+                    label=["Empty","The other"]
+                    #plt.plot(x,y,"o")
+                    plt.ylim(0,1)
+                
+                    plt.plot(self._micData[i]._x_y[k*2][0],self._micData[i]._x_y[k*2][1], linewidth=1)
+                    #plt.plot(x1,y1,"*")
+                    plt.plot(self._micData[i]._x_y[k*2+1][0],self._micData[i]._x_y[k*2+1][1], c="red",linewidth=1)
+                    plt.legend(label, loc =0) 
+                    plt.title("".join(["mic",str(self._micData[i]._micnum)]))
+                    #plt.title("Comparison")
+                    #plt.title("Envelope Detection")
+                    plt.xlabel("Distance(m)")
+                    plt.ylabel("Correlation")
+                    if k==0 :
+                        sEmpty+=self._micData[i]._x_y[0][1]
+                        sOther+=self._micData[i]._x_y[1][1]
                 #print(self._micData[i]._micnum,self._micData[i]._x_y[k*2][0])
             self._micData[i]._x_y.clear()
 
@@ -188,5 +190,5 @@ if __name__ == "__main__":
     reset_choice=input("reset_or_not:")
     if reset_choice=="1":
         Radar.reset()
-    #while True:
-    Radar.detect()
+    while True:
+        Radar.detect()
