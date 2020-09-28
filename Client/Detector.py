@@ -1,3 +1,13 @@
+# -*- encoding: utf-8 -*-
+'''
+@File    :   Detector.py
+@Time    :   2020/09/22 19:21:00
+@Author  :   Dil Duan
+@Version :   1.0
+@Contact :   1522740702@qq.com
+@License :   (C)Copyright 2020
+'''
+
 import os, wave, shutil
 import datetime
 import numpy as np
@@ -22,14 +32,14 @@ import mpl_toolkits.mplot3d
 logger = logzero.setup_logger("client", level=logging.INFO)
 
 class URadar:
-    """封装类"""
-    _thdz: float             #7.5           # 5.5 
-    _thdf: float             #8.5           # 6.5
+    """ 封装类 """
+    _thdz: float             # 5.5 
+    _thdf: float             # 6.5
    
     _outcome: str
     _prompt: str = "None"
 
-    _mics=[1,3,4,5,6]
+    _mics=[1, 2, 3, 4]
     _stability_count=2
     _reset_order=False
     _micData = []
@@ -38,21 +48,30 @@ class URadar:
     _PATH2="Barrier/barrier"
     
     file = None
+    _plotFile = [[]for i in range(2)]
     
-    def __init__(self, thdz=5, thdf=6) -> None:
+    def __init__(self, thdz=0.3, thdf=0.35) -> None:
+        """
+            初始化正向阈值，反向阈值，麦克风对象(MicData)
+        """
         self._thdz=thdz
         self._thdf=thdf
         for i in self._mics:
+            self._plotFile[0].append(None)
+            self._plotFile[1].append(None)
             self._micData.append(MicData(i, thdz, thdf))
 
     def reset(self):
+        """
+            重置背景信号
+            return: "OK" or null
+        """
         logger.info("正在重置...")
         if not os.path.exists(self._PATH1):
             os.makedirs(self._PATH1)
             
-        #out = self.tplay.play_and_record(self._PATH1,5)
-        #out = play_and_record(self._PATH1,5)
         out = os.popen("python3 playRec.py "+self._PATH1 +" 5").read().replace("\n", "")
+        #out = "OK"
         if out=="OK":
             logger.info("重置成功！")
         else:
@@ -61,9 +80,12 @@ class URadar:
     
 
     def forEveryMic(self, PATH1, PATH2):
-        """对每个mic收集的数据进行process处理，并行"""
+        """
+            对每个mic收集的数据进行process处理，并行
+            中间可以输出图像
+            return: the number of microphones whose result is "empty"
+        """
         count = 0
-        
         Threads=[]
         for i in range(len(self._mics)):
             t = Thread(target=self._micData[i].process, args=(PATH1, PATH2, self._mics[i],))
@@ -72,79 +94,76 @@ class URadar:
         for t in Threads:
             t.join()
         
-        sEmpty=np.zeros(self._micData[0]._cSlice*2)
-        sOther=np.zeros(self._micData[0]._cSlice*2)
         self.file.writelines("<<<<<<<<\n")
         for i in range(len(self._mics)):
+            print(i+1 ,self._micData[i]._process_result[1],self._micData[i]._process_result[2])
             self.file.writelines(str(self._micData[i]._process_result[0])+"---")
             self.file.writelines("mx:"+("%.2f"%self._micData[i]._process_result[1])+",mi:-"+("%.2f"%abs(self._micData[i]._process_result[2]))+"\n")
-            if self._micData[i]._process_result[1] <= self._thdz and abs(self._micData[i]._process_result[0]) <= self._thdf: # 阈值的设定？ empty    有待检验
+            if self._micData[i]._process_result[1] <= self._thdz and abs(self._micData[i]._process_result[2]) <= self._thdf: # 阈值的设定？ empty    有待检验
                 count+=1
-            self._micData[i]._process_result.clear()
+            self._micData[i]._process_result.clear()    # clear original data
             
-            for k in range(1):
-                plt.figure()
-                label=["Empty","The other"]
-                #plt.plot(x,y,"o")
-                plt.ylim(0,1)
-                plt.plot(self._micData[i]._x_y[k*2][0],self._micData[i]._x_y[k*2][1], linewidth=1)
-                #plt.plot(x1,y1,"*")
-                plt.plot(self._micData[i]._x_y[k*2+1][0],self._micData[i]._x_y[k*2+1][1], c="red",linewidth=1)
-                plt.legend(label, loc =0) 
-                plt.title("".join(["mic",str(self._micData[i]._micnum)]))
-                #plt.title("Comparison")
-                #plt.title("Envelope Detection")
-                plt.xlabel("Distance(m)")
-                plt.ylabel("Correlation")
-                if k==0 :
-                    sEmpty+=self._micData[i]._x_y[0][1]
-                    sOther+=self._micData[i]._x_y[1][1]
-                #print(self._micData[i]._micnum,self._micData[i]._x_y[k*2][0])
+            for k in range(2):   # two speakers
+                if len(self._micData[i]._x_y) and k*2 < len(self._micData[i]._x_y) :
+                    '''
+                    plt.figure()
+                    label=["Empty","The other"]
+                    plt.ylim(0,0.5)
+                    plt.plot(self._micData[i]._x_y[k*2][0],self._micData[i]._x_y[k*2][1], linewidth=1)
+                    plt.plot(self._micData[i]._x_y[k*2+1][0],self._micData[i]._x_y[k*2+1][1], c="red",linewidth=1)
+                    plt.legend(label, loc =0) 
+                    plt.title("".join(["mic",str(self._micData[i]._micnum), "-", str(k)]))
+                    plt.xlabel("Distance(m)")
+                    plt.ylabel("Correlation")
+                    '''
+                    for d in self._micData[i]._x_y[k*2+1][1]:
+                        self._plotFile[k][self._micData[i]._micnum-1].write(("%.5f"%d)+",")
+                    self._plotFile[k][self._micData[i]._micnum-1].write("\n")
+                    #print(self._micData[i]._micnum,self._micData[i]._x_y[k*2][0])
             self._micData[i]._x_y.clear()
 
-        plt.figure()
-        label=["Empty","The other"]
-        #plt.plot(x,y,"o")
-        plt.ylim(0,1)
-        plt.plot(sEmpty/len(self._mics), linewidth=1)
-        #plt.plot(x1,y1,"*")
-        plt.plot(sOther/len(self._mics), c="red",linewidth=1)
-        plt.legend(label, loc =0) 
-        plt.title("allmic")
-        #plt.title("Comparison")
-        #plt.title("Envelope Detection")
-        plt.xlabel("Distance(m)")
-        plt.ylabel("Correlation")
-            
-        plt.show()
-            
+        #plt.show() 
         #print(count)    
         return count
 
     def RecordAudio(self, PATH):
-        """采集音频数据"""
+        """
+            采集音频数据,中间会根据服务器的情况进行重置，输出提示音等
+            return: null
+        """
         if not os.path.exists(PATH): 
             os.makedirs(PATH)
-        out=""
+            
         if self._reset_order:
             self.reset()
             self._reset_order=False
             
         #存在提示音要占据音频端口的情况，先播放提示音
         if self._prompt != "None":
-            #playprompt(self._prompt)
+            playprompt(self._prompt)
             print("prompt",self._prompt)
             self._prompt="None"
-        
-        #out = self.tplay.play_and_record(PATH,3)
-        #out = play_and_record(PATH,3)
-        #out = os.popen("python3 playRec.py "+PATH +" 3").read().replace("\n", "")
+
+        out = os.popen("python3 playRec.py "+PATH +" 3").read()
+        #time.sleep(3)
         #print(out)
         
 
     def detect(self):
-        
+        """
+            检测程序：调用录音等程序，判断环境是否发生波动
+            return: the outcome of detecting
+        """
         # 记录数据
+        for k in range(2):
+            f_index = 1
+            part_path = "LMic"
+            if k == 1:
+                part_path = "RMic"
+            for k1 in range(len(self._plotFile[k])):
+                self._plotFile[k][k1] = open("MIC/"+part_path+"/data"+str(f_index)+".txt", mode="a+")
+                f_index += 1
+        
         self.file=open("MIC/Data.txt",mode="a+")
         self.file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+"\n")
       
@@ -165,43 +184,36 @@ class URadar:
                 PATH3=self._PATH2+str(postfix)
                 self.RecordAudio(PATH3)
                 count = self.forEveryMic(PATH2, PATH3)
-                if (scount==0 and count < 3) or (scount==1 and count < 3): #5
+                if count < 3:
                     scount = 0
                 PATH2=PATH3
                 postfix+=1
                 scount+=1
             count = self.forEveryMic(self._PATH1, PATH2)
     
-        if count >= 3: # 4
+        if count >= 3: 
             self._outcome="empty"
-            #if count >=5 :
-            #    for i in range(1,7):
-            #        os.remove("".join(["empty/mic",str(i),".wav"]))
-            #        shutil.copyfile("".join([PATH2,"/mic",str(i),".wav"]),"".join(["empty/mic",str(i),".wav"]))
+            
         else:
             self._outcome="nonempty"
-            #self._outcome="empty"
+
         logger.info(f"检测结果：{self._outcome}")
         self.file.writelines(self._outcome+"\n")
         self.file.close()
-        time.sleep(2)
+        for k in range(2):
+            for f in self._plotFile[k]:
+                f.close()
         
+        time.sleep(2)
         return self._outcome
-    
-def continuelly(Radar):
-    while True:
-        Radar.detect()
         
 
 if __name__ == "__main__":
-    # 启动通讯客户端
-    # ws = WebsocketClient()
-    # ws.server_url = "ws://localhost:2714"
-    # ws.device_id = "2"
-    # ws.Start()
+    """ for testing """
+    
     Radar=URadar()
-    reset_choice="0"#input("reset_or_not:")
-    if reset_choice=="1":
+    reset_choice = input("reset_or_not:")
+    if reset_choice == "1":
         Radar.reset()
     while True:
         Radar.detect()

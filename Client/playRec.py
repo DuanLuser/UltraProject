@@ -1,19 +1,29 @@
+# -*- encoding: utf-8 -*-
+'''
+@File    :   playRec.py
+@Time    :   2020/09/22 19:32:00
+@Author  :   Dil Duan
+@Version :   1.0
+@Contact :   1522740702@qq.com
+@License :   (C)Copyright 2020
+'''
+
 import os, sys
 import time, wave
 
 import pyaudio
-import soundfile
 import threading
+import numpy as np
 import sounddevice as sd
 
 from record import ignore_stderr
 
 def play_wav_on_index(audio_data, index):
     """
-    Play an audio file given as the result of `load_sound_file_into_memory`
-    :param audio_data: A two-dimensional NumPy array
-    :param index:
-    :return: None, returns when the data has all been consumed
+        Play an audio file given as the result of `load_sound_file_into_memory`
+        param audio_data: A two-dimensional NumPy array
+        param index:
+        return: None, returns when the data has all been consumed
     """
     sd.default.device[1] = index
     sd.play(audio_data, samplerate=44100, blocking=True)
@@ -28,27 +38,34 @@ class TdmaPlay:
     sound_card_indices: list = []
     
     def __init__(self):
-        self.expected_channels=[["seeed-8mic-voicecard",1], #record
-            ["USB Audio Device",0],
+        self.expected_channels=[["seeed",1], #record
+            ["USB Audio Device", 0],
             #["upmix",2]#play
             ]
 
     def load_sound_file_into_memory(self, path):
         """
-        Get the in-memory version of a given path to a wav file
-        :param path: wav file to be loaded
-        :return: audio_data, a 2D numpy array
+            Get the in-memory version of a given path to a wav file
+            param path: wav file to be loaded
+            return: audio_data, a 2D numpy array
         """
  
-        audio_data, self.Fs = soundfile.read(path, dtype=self.DATA_TYPE)
+        f = wave.open(path, 'rb')
+        params = f.getparams()
+        nchannels, sampwidth, self.Fs, nframes = params[:4]
+        str_data = f.readframes(nframes)
+        #print("samplewith", sampwidth)
+        f.close()
+        audio_data = np.frombuffer(str_data, dtype=self.DATA_TYPE)
+        audio_data = np.reshape(audio_data,[nframes,nchannels])
         return audio_data
  
  
     def get_device_number(self, index_info):
         """
-        Given a device dict, return True if the device is one of our USB sound cards and False if otherwise
-        :param index_info: a device info dict from PyAudio.
-        :return: True if expected card, False if otherwise
+            Given a device dict, return True if the device is one of our USB sound cards and False if otherwise
+            param index_info: a device info dict from PyAudio.
+            return: True if expected card, False if otherwise
         """
  
         index, info = index_info
@@ -56,16 +73,16 @@ class TdmaPlay:
         for item in self.expected_channels:
             if item[0] in info["name"]:
                 item[1]=index
-                if "seeed-8mic" not in item[0]:
+                if "seeed" not in item[0]:
                     self.sound_card_indices.append(index)
                 return index
         return False
         
     def good_filepath(self, path):
         """
-        Macro for returning false if the file is not a non-hidden wav file
-        :param path: path to the file
-        :return: true if a non-hidden wav, false if not a wav or hidden
+            Macro for returning false if the file is not a non-hidden wav file
+            param path: path to the file
+            return: true if a non-hidden wav, false if not a wav or hidden
         """
         return str(path).endswith(".wav") and (not str(path).startswith("."))
     
@@ -82,11 +99,8 @@ class TdmaPlay:
             os.path.join(cwd, path) for path in sorted(filter(lambda path: self.good_filepath(path), os.listdir(cwd)))]
         
         #print("Discovered the following .wav files:", sound_file_paths)
- 
         files = [self.load_sound_file_into_memory(path) for path in sound_file_paths]
- 
         #print("Files loaded into memory, Looking for devices.")
-        #print(sd.query_devices())
  
         list(filter(lambda x: x is not False,map(self.get_device_number,[index_info for index_info in enumerate(sd.query_devices())])))
  
@@ -110,6 +124,7 @@ class TdmaPlay:
             # playing
             for thread in threads:
                 thread.start()
+                
             # recording
             t=threading.Thread(target=ignore_stderr, args=[Path, self.expected_channels[0][1], Second])
             t.start()
@@ -121,9 +136,12 @@ class TdmaPlay:
             
             return "OK"
 
-# 播放提示音
 def playprompt(wav):
-    #os.popen('aplay -D "plughw:2,0" audio/prompt/'+ wav)
+    """
+       播放提示音
+       return: null
+    """
+    #os.system('aplay audio/prompt/'+ wav)  # the default port is USB audio card
     if wav == "网络连接成功.wav":
         time.sleep(2)
     elif wav == "网络连接失败，正在重新连接.wav":
@@ -133,14 +151,9 @@ def playprompt(wav):
     elif wav == "请注意，消防通道禁止阻塞，请立即移除障碍物.wav":
         time.sleep(5)
             
-'''
-def play_and_record(path, second): # 线程报错
-    tplay=TdmaPlay()
-    out = tplay.playrec(path, second)
-    return out
-'''
 
 if __name__ == "__main__":
+    
     tplay=TdmaPlay()
-    sys.exit(tplay.playrec(sys.argv[1], sys.argv[2]))
+    sys.exit(tplay.playrec(sys.argv[1], sys.argv[2])) #"testRecording","5"))#
     

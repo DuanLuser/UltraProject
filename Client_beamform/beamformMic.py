@@ -1,3 +1,13 @@
+# -*- encoding: utf-8 -*-
+'''
+@File    :   beamformMic.py
+@Time    :   2020/09/22 20:03:00
+@Author  :   Dil Duan
+@Version :   1.0
+@Contact :   1522740702@qq.com
+@License :   (C)Copyright 2020
+'''
+
 import os
 import wave
 import shutil
@@ -14,7 +24,7 @@ warnings.filterwarnings("ignore")
 
 
 class MicData:
-
+    """ 存储每个麦克风的数据信息 """
     _cSlice: int             # 988       # 3.5 m
     _rid: int                # 70           # no obstacles in 25 cm 
     _thdz: int
@@ -26,39 +36,43 @@ class MicData:
     _distance = 4851         # t=0.11s;  rate=44100
     _nor_val = 2000000        # 经验值
     
+    _cta : int
+    _rfa : int
     _result: list
     # record data for plotting figure
-    _x_y_0: list
-    _x_y_30: list
-    _x_y_60: list
-    _x_y_90: list
+    _x_y: list
 
-    def __init__(self, thdz: int, thdf: int) -> None:
-        self._cSlice = 500
-        self._rid = -100
+    def __init__(self, thdz: int, thdf: int, cta: int, rfa: int) -> None:
+        self._cSlice = 2117
+        self._rid = 260
         self._thdz = thdz
         self._thdf = thdf
+        self._cta = cta
+        self._rfa = rfa
         self._result = []
-        self._x_y_0 = []
-        self._x_y_30 = []
-        self._x_y_60 = []
-        self._x_y_90 = []
+        self._x_y = []
         
 
     def FilterBandpass(self, wave, fs):
-        """ 应用带通滤波器 """
+        """
+            带通滤波
+            return: filtered data
+        """
         l = self._low/(fs/2)
         h = self._high/(fs/2)
         b, a = signal.butter(5, [l, h], "bandpass")  # 配置滤波器 5/8 表示滤波器的阶数
         return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
     def averageNormalization(self, corr):
-        """多个周期取平均"""
+        """
+            按照周期分别提取出左右声道的音频(找到最高峰进行划分), 多个周期取平均
+            return: the average data(L, R)
+        """
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
 
-        i = 0             # 22050 44100     0.5s
+        i = 0
         first = 1
         first_detect = False
         while i+self._distance < corr.size:
@@ -103,8 +117,11 @@ class MicData:
                 out1 = out1/length  # 平均
         return out, out1
 
-    def afterAN(self, Ncorr, Ncorr1, cta, rfa):
-
+    def afterAN(self, Ncorr, Ncorr1):
+        """
+            多周期平均后的处理：包络检波、提取差异位置并找寻差异最大处
+            return: Maximum difference, Minimum difference
+        """
         aNcorr = Ncorr/self._nor_val            
         aNcorr1 = Ncorr1/self._nor_val
 
@@ -128,31 +145,21 @@ class MicData:
         y_smooth1=func1(x_new)
         #print("Type",type(y_smooth1))
         
-        #self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
-        if cta == 0:
-            self._x_y_0.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
-        if cta == 30:
-            self._x_y_30.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
-        if cta == 60:
-            self._x_y_60.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
-        if cta == 90:
-            self._x_y_90.append([(x_new+self._rid)/self._rate*340/2,y_smooth1, rfa])
+        self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
+        self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
         
-        
+        '''
         plt.figure()
         label=["Empty","The other"]
-        #plt.plot(x,y,"o")
         plt.ylim(0,1)
         plt.plot((x_new+self._rid)/self._rate*340/2, y_smooth,linewidth=1)
-        #plt.plot(x1,y1,"*")
         plt.plot((x_new+self._rid)/self._rate*340/2, y_smooth1,c="red",linewidth=1)
         plt.legend(label, loc =0) 
-        plt.title("".join([str(cta),"-", str(rfa)]))
-        #plt.title("Comparison")
-        #plt.title("Envelope Detection")
+        plt.title("".join([str(self._cta),"-", str(self._rfa)]))
         plt.xlabel("Distance(m)")
         plt.ylabel("Correlation")
         #plt.show()
+        '''
         
         #提取图2(The Other)中高于/低于图1(Empty)的所有点
         X=np.zeros(self._cSlice*2)
@@ -241,15 +248,15 @@ class MicData:
         for i in range(snum):
             delta_v=val1[i]-val[i]
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
-            #delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
+            delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
             
             if delta_v > self._thdz:
-                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2))
+                #print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
                 zflag=True
             #elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
-                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2-0.2))
+                #print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
             #else:
-                #print("%d: %f %f %fm"%(i, delta_v, delta_v/count[i],(X[int(maxsite[i])]+self._rid)/self._rate*340/2)) 
+                #print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i])) 
             if mx<delta_v:
                 mx=delta_v
                 mxs=i
@@ -268,11 +275,13 @@ class MicData:
         y_smooth=func(x_new)
         return y_smooth
 
-    def process(self, chirp, emic_fs_y, bmic_fs_y, delta_sample, cta, rfa):
-        """处理音频"""
-
+    def process(self, chirp, emic_fs_y, bmic_fs_y, delta_sample):
+        """
+            处理音频，获得差异值(位于背景信号之上/之下)
+            return: null
+        """
         min_delta = min(delta_sample)
-        print(delta_sample, min_delta)
+        #print(delta_sample, min_delta)
         
         fliter_ey = []
         fliter_by = []
@@ -281,12 +290,11 @@ class MicData:
             bdata = bmic_fs_y[i]
             eres = self.FilterBandpass(edata[2], edata[1])
             bres = self.FilterBandpass(bdata[2], bdata[1])
-            
             fliter_ey.append(eres)
             fliter_by.append(bres)
             
-        length_ey = len(fliter_ey[0])-15       # max(delta_sample[i])-min_delta =12
-        length_by = len(fliter_by[0])-15
+        length_ey = len(fliter_ey[0])-20       # max(delta_sample[i])-min_delta =10
+        length_by = len(fliter_by[0])-20
         
         aligned_efy = []
         aligned_bfy = []
@@ -313,7 +321,6 @@ class MicData:
         label=["".join(["mic","empty"]),"".join(["mic","other"])]
         plt.plot(sum_ecorr)
         plt.plot(sum_bcorr)
-        #plt.plot(sum_corr)
         plt.legend(label, loc =0) 
         plt.title("comparsion")
         plt.show()
@@ -322,11 +329,12 @@ class MicData:
         eNcorr, eNcorr1 = self.averageNormalization(sum_ecorr)
         bNcorr, bNcorr1 = self.averageNormalization(sum_bcorr)
         
-        mx,mi = self.afterAN(eNcorr,bNcorr, cta, rfa)
-        mx1,mi1 = self.afterAN(eNcorr1,bNcorr1, cta, rfa)
+        mx,mi = self.afterAN(eNcorr,bNcorr)
+        mx1,mi1 = self.afterAN(eNcorr1,bNcorr1)
         
-        #self._result.append([cta, rfa, max(mx,mx1), min(mi,mi1)])
-        return max(mx,mx1), min(mi,mi1)
+        self._result.append(max(mx,mx1))
+        self._result.append(min(mi,mi1))
+        #return max(mx,mx1), min(mi,mi1)
 
         
         

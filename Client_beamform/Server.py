@@ -43,6 +43,7 @@ class ICommClient:
     server_ping_interval: int = 10      # ping服务器的时间间隔(秒)
     
     radar: URadar = URadar()
+    picture: Picture = Picture()
     Obstacles: list = []
     firstConnect: bool = False
 
@@ -220,7 +221,7 @@ class ICommClient:
 
     #############雷达检测############
     def DetectReport(self):
-        reset_limit = timedelta(minutes = 60)
+        reset_limit = timedelta(minutes = 15)
         empty_count = 0
         prompt_count = 0
         Reported=False
@@ -253,8 +254,7 @@ class ICommClient:
                 for ob in self.Obstacles:    
                     if ob.IsReport==False:#now_time-ob.FirstAppear > ob.ReportLimit and ob.IsReport==False:
                         # 拍照上传
-                        picture=Picture()
-                        image_base64=picture.takePhoto()
+                        image_base64=self.picture.takePhoto()
                         self.Send(json.dumps({"cmd": "log", "level": "DETECTED","message":"检测到障碍物！","image": image_base64}))
                         ob.IsReport=True
                         logger.info("存在障碍物已上报！")
@@ -322,6 +322,7 @@ class UdpClient(ICommClient):
 
 # 测试用
 if __name__ == "__main__":
+    
     time.sleep(5)
     ws = WebsocketClient()
     ws.server_url = "ws://47.100.88.177:2714"
