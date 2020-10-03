@@ -1,38 +1,48 @@
+# -*- encoding: utf-8 -*-
+'''
+@File    :   processMic.py
+@Time    :   2020/09/22 19:32:00
+@Author  :   Dil Duan
+@Version :   1.0
+@Contact :   1522740702@qq.com
+@License :   (C)Copyright 2020
+'''
+
 import os
 import wave
 import shutil
 import datetime
 import numpy as np
 from scipy import signal
-from scipy.io import wavfile
 from pylab import *
-from scipy import interpolate
-from scipy import fftpack
+from scipy.io import wavfile
+from scipy import interpolate, fftpack
+import matplotlib.pyplot as plt
 
 import warnings
 warnings.filterwarnings("ignore")
 
 
 class MicData:
-
+    """ 存储每个麦克风的数据信息 """
     _micnum: int
     _cSlice: int             # 988       # 3.5 m
     _rid: int                # 70           # no obstacles in 25 cm 
     _thdz: int
     _thdf: int
     _process_result: list
-    _x_y: list
+    _x_y: list               # for plot figure
     
     _rate = 44100
     _low = 18000
     _high = 22000
-    _dur_time = 10/1000          # 10ms
-    _distance = 4851         # t=0.11s;  rate=44100
-    _nor_val = 500000        # 经验值
+    _dur_time = 10/1000       # 10ms
+    _distance = 4851          # t=0.11s;  rate=44100
+    _nor_val = 1000000        # 经验值
 
     def __init__(self, micnum: int, thdz: int, thdf: int) -> None:
-        self._cSlice = 500
-        self._rid = -100
+        self._cSlice = 2117
+        self._rid = 390
         self._process_result=[]
         self._x_y=[]
         self._micnum = micnum
@@ -41,14 +51,20 @@ class MicData:
         
 
     def FilterBandpass(self, wave, fs):
-        """ 应用带通滤波器 """
+        """
+            带通滤波
+            return: filtered data
+        """
         l = self._low/(fs/2)
         h = self._high/(fs/2)
         b, a = signal.butter(5, [l, h], "bandpass")  # 配置滤波器 5/8 表示滤波器的阶数
         return signal.filtfilt(b, a, wave)  # data为要过滤的信号
 
     def averageNormalization(self, corr):
-        """多个周期取平均"""
+        """
+            按照周期分别提取出左右声道的音频(找到最高峰进行划分), 多个周期取平均
+            return: the average data(L, R)
+        """
         #peaks, _ = signal.find_peaks(corr, height=1000, distance=24480)  # 寻找整个序列的峰值
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
@@ -58,7 +74,7 @@ class MicData:
         first_detect = False
         while i+self._distance < corr.size:
             site=np.argmax(corr[i:i+self._distance])+i
-            if corr[site] > 10000 :
+            if corr[site] > 200000 :
                 c = {}
                 c["PeakIndex"] = site
                 c["PeakHeight"] = corr[site]
@@ -66,30 +82,32 @@ class MicData:
                 if first % 2 :
                     peaks_lists[0].append(site)
                     cycles_lists[0].append(c)
+                    #print(self._micnum, "-", site)
                 else:
                     peaks_lists[1].append(site)
                     cycles_lists[1].append(c)
+                    #print(self._micnum, "=", site)
                 if first == 1 :
                     first_detect = True
             if first_detect :
                 first += 1
             i += self._distance
     
-        #print(micnum,len(peaks_lists[0]))
-        #print(micnum, len(peaks_lists[1]))
+        #print(self._micnum, len(peaks_lists[0]))
+        #print(self._micnum, len(peaks_lists[1]))
         out = np.zeros(self._cSlice-self._rid)
         out1 = np.zeros(self._cSlice-self._rid)
         for i in range(2):
-            count=0
+            count = 0
             for i1 in range(len(cycles_lists[i])):
                 if i == 0:
                     if len(cycles_lists[i][i1][("Corr")])!=(self._cSlice-self._rid):
-                        count+=1
+                        count += 1
                     else:
                         out += cycles_lists[i][i1][("Corr")]
                 else:
                     if len(cycles_lists[i][i1][("Corr")])!=(self._cSlice-self._rid):
-                        count+=1
+                        count += 1
                     else:
                         out1 += cycles_lists[i][i1][("Corr")]
             if i == 0:
@@ -101,11 +119,14 @@ class MicData:
         return out, out1
 
     def afterAN(self, Ncorr, Ncorr1, micnum):
-
+        """
+            多周期平均后的处理：包络检波、提取差异位置并找寻差异最大处
+            return: the number of microphone, Maximum difference, Minimum difference
+        """
         aNcorr = Ncorr/self._nor_val            
         aNcorr1 = Ncorr1/self._nor_val
 
-        #获取极值点    
+        #获取极值点, 包络检波
         x=signal.argrelextrema(aNcorr, np.greater)[0]
         y=aNcorr[x]
         x1=signal.argrelextrema(aNcorr1, np.greater)[0]
@@ -113,12 +134,11 @@ class MicData:
         
         #for safety
         if x.size <=0 or x1.size <= 0:
-            print('here')
             return micnum,0,0
     
         #统一坐标轴，插值平滑
-        x_min=max(x[0],x1[0])
-        x_max=min(x[x.size-1],x1[x1.size-1])
+        x_min = max(x[0],x1[0])
+        x_max = min(x[x.size-1],x1[x1.size-1])
         x_new = np.linspace(x_min,x_max,self._cSlice*2) #!!!_cSlice的大小会影响每个区域点的个数
         func=interpolate.interp1d(x,y, kind="cubic")
         y_smooth=func(x_new)
@@ -207,25 +227,46 @@ class MicData:
                 i+=1
             snum+=1
             maxheight=-1
+        
+        # 类比于求方差的思想
+        i=0
+        snumi = 0
+        cgma=np.zeros(site)
+        cgma1=np.zeros(site)
+        while i < site :
+            while i < site and X[i] < 0 :
+                i+=1
+            if i >= site :
+                break
+
+            aver = val[snumi]/count[snumi]
+            while i < site and X[i] >= 0 :
+                cgma[snumi] += (Y[i] - aver) * (Y[i] - aver)
+                cgma1[snumi] += (Y1[i] - aver) * (Y1[i] - aver)
+                i+=1
+            snumi+=1
+
 
         mx=0
         mxs=-1
         mis=-1
         mi=2147483647
         zflag=False #前面没有正着超过阈值的情况，可取delta_v < 0 and abs(delta_v)>thdf的距离
-        print("mic:%d"%micnum)
+        #print("mic:%d"%micnum)
         for i in range(snum):
-            delta_v=val1[i]-val[i]
+            delta_v=(cgma1[i]-cgma[i])*15#val1[i]-val[i]#
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
-            #delta_v=delta_v*math.e**(0.2*maxD)#maxD*maxD
-
+            #if val[i]>10:
+            delta_v=delta_v*math.e**(0.1*maxD)#maxD*maxD
+            #else:
+            #    delta_v=delta_v*math.e**(0.4*maxD)#maxD*maxD
             if delta_v > self._thdz:
-                print("%.2fm %.4f %.4f"%(maxD, delta_v, delta_v/count[i]))
+                #print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
                 zflag=True
-            elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
-                print("%.2fm %.4f %.4f"%(maxD, delta_v, delta_v/count[i]))
-            else:
-                print("%.2fm %.4f %.4f"%(maxD, delta_v, delta_v/count[i]))
+            #elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
+                #print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
+            #else:
+                #print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i])) 
             if mx<delta_v:
                 mx=delta_v
                 mxs=i
@@ -236,9 +277,13 @@ class MicData:
             mi=0
 
         return micnum,mx,mi
-
+    
+    
     def process(self, PATH1, PATH2, micnum):
-        """处理音频，获得差异值(位于背景信号之上/之下)"""
+        """
+            处理音频，获得差异值(位于背景信号之上/之下)
+            return: null
+        """
 
         filename1 = f"{PATH1}/mic{micnum}.wav"
         filename2 = f"{PATH2}/mic{micnum}.wav"
@@ -248,7 +293,14 @@ class MicData:
         # 获得音频原始数据
         Fs, y = wavfile.read(filename1) # 空
         Fs1, y1 = wavfile.read(filename2) # 空
-
+        
+        '''
+        plt.figure()
+        plt.plot(y)
+        plt.plot(y1)
+        plt.show()
+        '''
+        
         # 滤波
         fliter_y = self.FilterBandpass(y, Fs)
         fliter_y1 = self.FilterBandpass(y1, Fs1)
@@ -256,14 +308,14 @@ class MicData:
         # 互相关
         corr = np.abs(np.correlate(fliter_y, chirp, mode="full"))
         corr1 = np.abs(np.correlate(fliter_y1, chirp, mode="full"))
+        
         '''
         plt.figure()
-        #plt.plot(x,y,"o")
         plt.plot(corr)
-        #plt.plot(x1,y1,"*")
         plt.plot(corr1)
         plt.show()
         '''
+        
         # 平均 and 归一化
         Ncorr, Ncorr_1= self.averageNormalization(corr)
         Ncorr1, Ncorr1_1 = self.averageNormalization(corr1)

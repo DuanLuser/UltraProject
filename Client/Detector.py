@@ -105,24 +105,24 @@ class URadar:
             
             for k in range(2):   # two speakers
                 if len(self._micData[i]._x_y) and k*2 < len(self._micData[i]._x_y) :
-                    '''
+                    
                     plt.figure()
                     label=["Empty","The other"]
-                    plt.ylim(0,0.5)
+                    plt.ylim(0,0.8)
                     plt.plot(self._micData[i]._x_y[k*2][0],self._micData[i]._x_y[k*2][1], linewidth=1)
                     plt.plot(self._micData[i]._x_y[k*2+1][0],self._micData[i]._x_y[k*2+1][1], c="red",linewidth=1)
                     plt.legend(label, loc =0) 
                     plt.title("".join(["mic",str(self._micData[i]._micnum), "-", str(k)]))
                     plt.xlabel("Distance(m)")
                     plt.ylabel("Correlation")
-                    '''
+                    
                     for d in self._micData[i]._x_y[k*2+1][1]:
                         self._plotFile[k][self._micData[i]._micnum-1].write(("%.5f"%d)+",")
                     self._plotFile[k][self._micData[i]._micnum-1].write("\n")
                     #print(self._micData[i]._micnum,self._micData[i]._x_y[k*2][0])
             self._micData[i]._x_y.clear()
 
-        #plt.show() 
+        plt.show() 
         #print(count)    
         return count
 

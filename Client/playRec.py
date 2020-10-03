@@ -17,6 +17,7 @@ import numpy as np
 import sounddevice as sd
 
 from record import ignore_stderr
+from setvolume import setvol
 
 def play_wav_on_index(audio_data, index):
     """
@@ -87,8 +88,8 @@ class TdmaPlay:
         return str(path).endswith(".wav") and (not str(path).startswith("."))
     
     def playrec(self, Path, Second):
+    
         cwd = ""
-        
         if Second=="5":
             cwd="audio/reset/"
         if Second=="3":
@@ -141,7 +142,9 @@ def playprompt(wav):
        播放提示音
        return: null
     """
+    #setvol("70%")
     #os.system('aplay audio/prompt/'+ wav)  # the default port is USB audio card
+    #os.system('aplay -D plughw:0,0 audio/prompt/'+ wav)  # corresponding USD audio card
     if wav == "网络连接成功.wav":
         time.sleep(2)
     elif wav == "网络连接失败，正在重新连接.wav":
@@ -150,10 +153,11 @@ def playprompt(wav):
         time.sleep(3)
     elif wav == "请注意，消防通道禁止阻塞，请立即移除障碍物.wav":
         time.sleep(5)
-            
+    #setvol("100%")      
 
 if __name__ == "__main__":
     
+    #playprompt("网络连接成功.wav")
     tplay=TdmaPlay()
     sys.exit(tplay.playrec(sys.argv[1], sys.argv[2])) #"testRecording","5"))#
     

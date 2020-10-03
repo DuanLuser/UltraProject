@@ -30,7 +30,8 @@ logger = logzero.setup_logger("Comm")
 
 
 class ICommClient:
-    """通信客户端抽象类，封装了主要的发送、接收、重连逻辑。具体通信方式应当继承该类并实现
+    """
+        通信客户端抽象类，封装了主要的发送、接收、重连逻辑。具体通信方式应当继承该类并实现
     """
 
     ###########Public成员#############
@@ -43,6 +44,7 @@ class ICommClient:
     server_ping_interval: int = 10      # ping服务器的时间间隔(秒)
     
     radar: URadar = URadar()
+    picture: Picture = Picture()
     Obstacles: list = []
     firstConnect: bool = False
 
@@ -115,13 +117,13 @@ class ICommClient:
         self._is_connected = True
         logger.info(f"连接到服务器成功: {self.server_url}")
         if not self.firstConnect:
-            #playprompt("网络连接成功.wav")
+            playprompt("网络连接成功.wav")
             print("网络连接成功.wav")
             self.firstConnect=True
             Thread(target=self.DetectReport).start() # 连接成功后，启动检测
         else:
             print('网络连接成功.wav')
-            self.radar.prompt="网络连接成功.wav"
+            self.radar._prompt="网络连接成功.wav"
 
         # 移除连接定时器
         self._scheduler.remove_job("Connect")
@@ -149,7 +151,7 @@ class ICommClient:
         # 连接成功后断开
         if self.firstConnect:
             print('网络连接失败，正在重新连接.wav')
-            self.radar.prompt="网络连接失败，正在重新连接.wav"
+            self.radar._prompt="网络连接失败，正在重新连接.wav"
         
         # 移除ping定时器
         self._scheduler.remove_job("CheckAlive")
@@ -169,7 +171,7 @@ class ICommClient:
         """
         logger.info(f"无法连接到服务器({reason})，{self.server_connect_interval}s后重试")
         if not self.firstConnect:
-            #playprompt("网络连接失败，正在重新连接.wav")
+            playprompt("网络连接失败，正在重新连接.wav")
             print("网络连接失败，正在重新连接.wav")
 
     def OnMessage(self, message: str):
@@ -220,7 +222,7 @@ class ICommClient:
 
     #############雷达检测############
     def DetectReport(self):
-        reset_limit = timedelta(minutes = 60)
+        reset_limit = timedelta(minutes = 15)
         empty_count = 0
         prompt_count = 0
         Reported=False
@@ -238,12 +240,12 @@ class ICommClient:
                         Reported=False
                     #else: 后续判断障碍物是否改变
                     if prompt_count < 3: # 连续提示次数
-                        #playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
+                        playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         print("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         prompt_count+=1  
                 if outcome=="empty" and len(self.Obstacles)!=0:
                     self.Obstacles.clear()
-                    #playprompt("障碍物已移除，谢谢配合.wav")
+                    playprompt("障碍物已移除，谢谢配合.wav")
                     print("障碍物已移除，谢谢配合.wav")
                     if Reported==True:
                         self.Send(json.dumps({"cmd": "log", "level": "REMOVED","message":"障碍物已移除"}))
@@ -253,14 +255,13 @@ class ICommClient:
                 for ob in self.Obstacles:    
                     if ob.IsReport==False:#now_time-ob.FirstAppear > ob.ReportLimit and ob.IsReport==False:
                         # 拍照上传
-                        picture=Picture()
-                        image_base64=picture.takePhoto()
+                        image_base64=self.picture.takePhoto()
                         self.Send(json.dumps({"cmd": "log", "level": "DETECTED","message":"检测到障碍物！","image": image_base64}))
                         ob.IsReport=True
                         logger.info("存在障碍物已上报！")
                         Reported=True
+                        
                 # 一段时间后自行reset
-                '''
                 now_time=datetime.now()
                 if outcome == 'empty' and  now_time-reset_time >= reset_limit :
                     empty_count+=1
@@ -268,7 +269,6 @@ class ICommClient:
                         reset_time = now_time
                         empty_count = 0
                         logger.info("重置成功！")
-                '''
                         
 
 class WebsocketClient(ICommClient):

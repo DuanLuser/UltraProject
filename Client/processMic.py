@@ -14,10 +14,10 @@ import shutil
 import datetime
 import numpy as np
 from scipy import signal
-from scipy.io import wavfile
 from pylab import *
-from scipy import interpolate
-from scipy import fftpack
+from scipy.io import wavfile
+from scipy import interpolate, fftpack
+import matplotlib.pyplot as plt
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -126,7 +126,7 @@ class MicData:
         aNcorr = Ncorr/self._nor_val            
         aNcorr1 = Ncorr1/self._nor_val
 
-        #获取极值点    
+        #获取极值点, 包络检波
         x=signal.argrelextrema(aNcorr, np.greater)[0]
         y=aNcorr[x]
         x1=signal.argrelextrema(aNcorr1, np.greater)[0]
