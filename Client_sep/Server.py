@@ -21,7 +21,7 @@ from websocket import WebSocketApp
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Thread, Event, Lock
 
-from Detector import URadar
+from Manager import manager
 from ObstaclesStatus import ObstacleStatus
 from camera import Picture
 from playRec import playprompt
@@ -43,7 +43,7 @@ class ICommClient:
     server_ping_maxfailure: int = 3     # ping服务器最大失败次数
     server_ping_interval: int = 10      # ping服务器的时间间隔(秒)
     
-    radar: URadar = URadar()
+    manager_radar: manager = manager()
     picture: Picture = Picture()
     Obstacles: list = []
     firstConnect: bool = False
@@ -101,7 +101,6 @@ class ICommClient:
     
     def SendJson(self, data) -> None:
         """发送Json消息
-
         Parameters
         ----------
         data : Any
@@ -123,7 +122,7 @@ class ICommClient:
             Thread(target=self.DetectReport).start() # 连接成功后，启动检测
         else:
             print('网络连接成功.wav')
-            self.radar._prompt="网络连接成功.wav"
+            self.manager_radar._prompt="网络连接成功.wav"
 
         # 移除连接定时器
         self._scheduler.remove_job("Connect")
@@ -151,7 +150,7 @@ class ICommClient:
         # 连接成功后断开
         if self.firstConnect:
             print('网络连接失败，正在重新连接.wav')
-            self.radar._prompt="网络连接失败，正在重新连接.wav"
+            self.manager_radar._prompt="网络连接失败，正在重新连接.wav"
         
         # 移除ping定时器
         self._scheduler.remove_job("CheckAlive")
@@ -190,7 +189,8 @@ class ICommClient:
             self._server_replied_event.set()
             
         if message == "reset":
-            self.radar.reset_order=True
+            for radar in self.manager_radar._Radars:
+                radar._to_reset = True
             self.Obstacles.clear()
             self.Send("resetOk")
                       
@@ -222,15 +222,16 @@ class ICommClient:
 
     #############雷达检测############
     def DetectReport(self):
+
         reset_limit = timedelta(minutes = 15)
         empty_count = 0
         prompt_count = 0
         Reported=False
         
-        if self.radar.reset()=="OK":
+        if self.manager_radar.reset_all()=="OK":
             reset_time = datetime.now()
             while True:
-                outcome = self.radar.detect()
+                outcome = self.manager_radar.detect_by_turns()
                 if outcome=="nonempty":
                     empty_count = 0
                     if len(self.Obstacles)==0:
@@ -265,7 +266,7 @@ class ICommClient:
                 now_time=datetime.now()
                 if outcome == 'empty' and  now_time-reset_time >= reset_limit :
                     empty_count+=1
-                    if empty_count==2 and self.radar.reset()=="OK":
+                    if empty_count==2 and self.manager_radar.reset_all()=="OK":
                         reset_time = now_time
                         empty_count = 0
                         logger.info("重置成功！")

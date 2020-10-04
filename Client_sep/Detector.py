@@ -15,19 +15,13 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.io import wavfile
 from pylab import *
-from scipy import interpolate
 from threading import Thread, Event
 import logging, logzero
 
-from playRec import playprompt
 from processMic import MicData
 
 import warnings
 warnings.filterwarnings("ignore")
-
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
-import mpl_toolkits.mplot3d
 
 logger = logzero.setup_logger("client", level=logging.INFO)
 
@@ -35,29 +29,29 @@ class URadar:
     """ 封装类 """
     _thdz: float             # 5.5 
     _thdf: float             # 6.5
-   
     _outcome: str
-    _prompt: str = "None"
 
-    _mics=[1, 2, 3, 4]
-    _stability_count=2
-    _reset_order=False
+    _mics = [1, 2, 3, 4]
+    _stability_count = 1
+    _to_reset = False
     _micData = []
     
-    _PATH1="Empty"
-    _PATH2="Barrier/barrier"
-    
-    MACs=["FC:58:FA:F7:D5:EF","81:0D:F6:34:02:1B"]
+    _PATH1: str
+    _PATH2: str
     
     file = None
     _plotFile = [[]for i in range(2)]
+    _MAC: str
     
-    def __init__(self, thdz=0.3, thdf=0.35) -> None:
+    def __init__(self, thdz=0.3, thdf=0.35, MAC="None") -> None:
         """
             初始化正向阈值，反向阈值，麦克风对象(MicData)
         """
         self._thdz=thdz
         self._thdf=thdf
+        self._MAC=MAC
+        self._PATH1 = "recordData/"+MAC+"/Empty"
+        self._PATH2 = "recordData/"+MAC+"/Barrier/barrier"
         for i in self._mics:
             self._plotFile[0].append(None)
             self._plotFile[1].append(None)
@@ -67,18 +61,17 @@ class URadar:
         """
             重置背景信号
             return: "OK" or null
-        """
-        logger.info("正在重置...")
+        """ 
+        logger.info(self._MAC+" 正在重置...")
         if not os.path.exists(self._PATH1):
             os.makedirs(self._PATH1)
             
-        out = os.popen("python3 playRec.py "+self._PATH1 +" 5 "+self.MACs[0]).read().replace("\n", "")
-        out = os.popen("python3 playRec.py "+self._PATH1 +" 5 "+self.MACs[1]).read().replace("\n", "")
+        out = os.popen("python3 playRec.py "+self._PATH1 +" 5 "+self._MAC).read().replace("\n", "")
         #out = "OK"
         if out=="OK":
-            logger.info("重置成功！")
+            logger.info(self._MAC+" 重置成功！")
         else:
-            logger.info("重置失败！")
+            logger.info(self._MAC+" 重置失败！")
             sys.exit()
         return out
     
@@ -120,9 +113,9 @@ class URadar:
                     plt.xlabel("Distance(m)")
                     plt.ylabel("Correlation")
                     
-                    #for d in self._micData[i]._x_y[k*2+1][1]:
-                    #    self._plotFile[k][self._micData[i]._micnum-1].write(("%.5f"%d)+",")
-                    #self._plotFile[k][self._micData[i]._micnum-1].write("\n")
+                    for d in self._micData[i]._x_y[k*2+1][1]:
+                        self._plotFile[k][self._micData[i]._micnum-1].write(("%.5f"%d)+",")
+                    self._plotFile[k][self._micData[i]._micnum-1].write("\n")
                     #print(self._micData[i]._micnum,self._micData[i]._x_y[k*2][0])
             self._micData[i]._x_y.clear()
 
@@ -137,19 +130,12 @@ class URadar:
         """
         if not os.path.exists(PATH): 
             os.makedirs(PATH)
-            
-        if self._reset_order:
-            self.reset()
-            self._reset_order=False
-            
-        #存在提示音要占据音频端口的情况，先播放提示音
-        if self._prompt != "None":
-            playprompt(self._prompt)
-            print("prompt",self._prompt)
-            self._prompt="None"
 
-        out = os.popen("python3 playRec.py "+PATH +" 3 "+self.MACs[0]).read()
-        #time.sleep(3)
+        if self._to_reset == True:
+            self.reset()
+            self._to_reset = False
+
+        out = os.popen("python3 playRec.py "+PATH +" 3 "+self._MAC).read()
         #print(out)
         
 
@@ -159,18 +145,18 @@ class URadar:
             return: the outcome of detecting
         """
         # 记录数据
-        '''
         for k in range(2):
             f_index = 1
-            part_path = "LMic"
+            part_path = "MIC/"+self._MAC+"/LMic"
             if k == 1:
-                part_path = "RMic"
+                part_path = "MIC/"+self._MAC+"/RMic"
+            if not os.path.exists(part_path): 
+                os.makedirs(part_path)
             for k1 in range(len(self._plotFile[k])):
-                self._plotFile[k][k1] = open("MIC/"+part_path+"/data"+str(f_index)+".txt", mode="a+")
+                self._plotFile[k][k1] = open(part_path+"/data"+str(f_index)+".txt", mode="a+")
                 f_index += 1
-        '''
         
-        self.file=open("MIC/Data.txt",mode="a+")
+        self.file=open("MIC/Data-"+self._MAC+".txt",mode="a+")
         self.file.writelines(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")+"\n")
       
         
@@ -178,7 +164,7 @@ class URadar:
         count = self.forEveryMic(self._PATH1, self._PATH2)
         # 
         if count < 3: # 3
-            logger.info("检测到环境波动...")
+            logger.info(self._MAC+" 检测到环境波动...")
             time.sleep(3)
             # 判断环境是否稳定
             scount=0
@@ -186,7 +172,7 @@ class URadar:
             PATH2=self._PATH2
             self.RecordAudio(PATH2)
             while scount < self._stability_count:
-                logger.info("持续检测中...")
+                logger.info(self._MAC+" 持续检测中...")
                 PATH3=self._PATH2+str(postfix)
                 self.RecordAudio(PATH3)
                 count = self.forEveryMic(PATH2, PATH3)
@@ -203,12 +189,12 @@ class URadar:
         else:
             self._outcome="nonempty"
 
-        logger.info(f"检测结果：{self._outcome}")
+        logger.info(self._MAC+f" 检测结果：{self._outcome}")
         self.file.writelines(self._outcome+"\n")
         self.file.close()
-        #for k in range(2):
-        #    for f in self._plotFile[k]:
-        #        f.close()
+        for k in range(2):
+            for f in self._plotFile[k]:
+                f.close()
         
         time.sleep(2)
         return self._outcome
@@ -217,7 +203,7 @@ class URadar:
 if __name__ == "__main__":
     """ for testing """
     
-    Radar=URadar()
+    Radar=URadar(MAC="FC:58:FA:F7:D5:EF")
     reset_choice = input("reset_or_not:")
     if reset_choice == "1":
         Radar.reset()
