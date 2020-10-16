@@ -11,7 +11,11 @@ from record import ignore_stderr
 from setvolume import setvol
 
 def play_with_buletooth(MAC, audio):
-    out = os.popen("aplay -D bluealsa:DEV="+MAC+",PROFILE=A2DP "+audio).readlines()
+    
+    if MAC == "NoAddress":
+        os.system("aplay -D plughw:0,0 "+audio)
+    else:
+        os.system("aplay -D bluealsa:DEV="+MAC+",PROFILE=A2DP "+audio)
     
 class TdmaPlay:
     
@@ -19,9 +23,7 @@ class TdmaPlay:
     def __init__(self):
         self.expected_channels=[["seeed",1], #record
             #["USB Audio Device",0],
-            #["upmix",2]#play
         ]
- 
  
     def get_device_number(self, index_info):
  
@@ -43,6 +45,8 @@ class TdmaPlay:
             cwd="audio/reset/"
         if Second=="3":
             cwd="audio/detect/"
+        if Second=="2":
+            cwd="audio/test/"   
         sound_file_paths = [
             os.path.join(cwd, path) for path in sorted(filter(lambda path: self.good_filepath(path), os.listdir(cwd)))]
         
@@ -69,6 +73,7 @@ def playprompt(wav):
     #setvol("70%")
     #os.system('aplay audio/prompt/'+ wav)  # the default port is USB audio card
     #os.system('aplay -D plughw:0,0 audio/prompt/'+ wav)  # corresponding USD audio card
+    
     if wav == "网络连接成功.wav":
         time.sleep(2)
     elif wav == "网络连接失败，正在重新连接.wav":
@@ -77,10 +82,13 @@ def playprompt(wav):
         time.sleep(3)
     elif wav == "请注意，消防通道禁止阻塞，请立即移除障碍物.wav":
         time.sleep(5)
+    
     #setvol("100%") 
             
 
 if __name__ == "__main__":
-    tplay=TdmaPlay()
-    sys.exit(tplay.playrec(sys.argv[1], sys.argv[2], sys.argv[3]))#"Empty","5","FC:58:FA:F7:D5:EF"))#
     
+    tplay=TdmaPlay()
+    sys.exit(tplay.playrec(sys.argv[1], sys.argv[2], sys.argv[3]))#"testRecording","5","81:0D:F6:34:02:1B"))#sys.argv[1], sys.argv[2], sys.argv[3]))#
+    
+# 0C:70:89:6E:18:E0    81:0D:F6:34:02:1B 

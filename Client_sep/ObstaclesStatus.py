@@ -12,16 +12,16 @@ from datetime import datetime, timedelta
 
 class ObstacleStatus:
     """ 储存出现的障碍的状态 """
-    IsExist: bool
-    IsReport: bool
-    FirstAppear: datetime
+    _isExist: bool
+    _isReport: bool
+    _firstAppear: datetime
     
-    ReportLimit=timedelta(minutes = 1)
+    _reportLimit=timedelta(minutes = 1)
     
     def __init__(self):
-        self.IsExist=True
-        self.IsReport=False
-        self.FirstAppear=datetime.now()
+        self._isExist=True
+        self._isReport=False
+        self._firstAppear=datetime.now()
 
 
     '''

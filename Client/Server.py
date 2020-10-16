@@ -47,6 +47,7 @@ class ICommClient:
     picture: Picture = Picture()
     Obstacles: list = []
     firstConnect: bool = False
+    report_imm: bool = True #False
 
     ###########Protected成员#############
     _server_replied_event: Event = Event()  # 用于检测服务器在线
@@ -118,7 +119,6 @@ class ICommClient:
         logger.info(f"连接到服务器成功: {self.server_url}")
         if not self.firstConnect:
             playprompt("网络连接成功.wav")
-            print("网络连接成功.wav")
             self.firstConnect=True
             Thread(target=self.DetectReport).start() # 连接成功后，启动检测
         else:
@@ -172,7 +172,6 @@ class ICommClient:
         logger.info(f"无法连接到服务器({reason})，{self.server_connect_interval}s后重试")
         if not self.firstConnect:
             playprompt("网络连接失败，正在重新连接.wav")
-            print("网络连接失败，正在重新连接.wav")
 
     def OnMessage(self, message: str):
         """接收到服务器消息时
@@ -226,13 +225,17 @@ class ICommClient:
         empty_count = 0
         prompt_count = 0
         Reported=False
-        
+        nonempty_count = 0        
+
         if self.radar.reset()=="OK":
             reset_time = datetime.now()
             while True:
                 outcome = self.radar.detect()
                 if outcome=="nonempty":
+                    nonempty_count += 1
                     empty_count = 0
+                else: nonempty_count = 0
+                if nonempty_count >= 2:
                     if len(self.Obstacles)==0:
                         obstacle=ObstacleStatus()
                         self.Obstacles.append(obstacle)
@@ -241,23 +244,25 @@ class ICommClient:
                     #else: 后续判断障碍物是否改变
                     if prompt_count < 3: # 连续提示次数
                         playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
-                        print("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         prompt_count+=1  
                 if outcome=="empty" and len(self.Obstacles)!=0:
                     self.Obstacles.clear()
                     playprompt("障碍物已移除，谢谢配合.wav")
-                    print("障碍物已移除，谢谢配合.wav")
                     if Reported==True:
                         self.Send(json.dumps({"cmd": "log", "level": "REMOVED","message":"障碍物已移除"}))
                         logger.info("障碍物移除已上报！")
                     
                 now_time=datetime.now()
-                for ob in self.Obstacles:    
-                    if ob.IsReport==False:#now_time-ob.FirstAppear > ob.ReportLimit and ob.IsReport==False:
+                for ob in self.Obstacles:   
+                    report_flag=(ob._isReport==False)
+                    if self.report_imm == False:
+                        report_flag=(now_time-ob._firstAppear > ob._reportLimit and ob._isReport==False)
+                    if report_flag:
                         # 拍照上传
                         image_base64=self.picture.takePhoto()
-                        self.Send(json.dumps({"cmd": "log", "level": "DETECTED","message":"检测到障碍物！","image": image_base64}))
-                        ob.IsReport=True
+                        self.Send(json.dumps({"cmd": "log", "level": "DETECTED","message":"检测到障碍物！",\
+                            "image": image_base64}))
+                        ob._isReport=True
                         logger.info("存在障碍物已上报！")
                         Reported=True
                         

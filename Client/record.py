@@ -97,5 +97,4 @@ def recordaudio(path, index, time):
 
 if __name__=="__main__":
     
-    #ignore_stderr('Empty',1, 5)#sys.argv[1], sys.argv[2])
     ignore_stderr(sys.argv[1], sys.argv[2], sys.argv[3]) #'Barrier/barrier',2,3)#

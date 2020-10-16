@@ -10,7 +10,7 @@
 
 import os, sys
 import time, wave
-
+import subprocess
 import pyaudio
 import threading
 import numpy as np
@@ -33,7 +33,7 @@ def play_wav_on_index(audio_data, index):
 class TdmaPlay:
     
     Fs: int = 44100
-    DATA_TYPE:str = "float32"
+    DATA_TYPE:str = "int16"
     
     expected_channel: list = []
     sound_card_indices: list = []
@@ -106,13 +106,11 @@ class TdmaPlay:
         list(filter(lambda x: x is not False,map(self.get_device_number,[index_info for index_info in enumerate(sd.query_devices())])))
  
         #print("Discovered the following sound devices", self.sound_card_indices)
-        #print(self.expected_channels)
+
         running = True
- 
         if not len(self.sound_card_indices) > 0:
             running = False
             #print("No audio devices found, stopping")
- 
         if not len(files) > 0:
             running = False
             #print("No sound files found, stopping")
@@ -142,9 +140,11 @@ def playprompt(wav):
        播放提示音
        return: null
     """
-    #setvol("70%")
-    #os.system('aplay audio/prompt/'+ wav)  # the default port is USB audio card
+    print(wav)
+    setvol("50%")
+    #subprocess.Popen('aplay audio/prompt/'+ wav, shell=True)  # the default port is USB audio card
     #os.system('aplay -D plughw:0,0 audio/prompt/'+ wav)  # corresponding USD audio card
+    '''
     if wav == "网络连接成功.wav":
         time.sleep(2)
     elif wav == "网络连接失败，正在重新连接.wav":
@@ -153,7 +153,8 @@ def playprompt(wav):
         time.sleep(3)
     elif wav == "请注意，消防通道禁止阻塞，请立即移除障碍物.wav":
         time.sleep(5)
-    #setvol("100%")      
+    '''
+    setvol("100%")      
 
 if __name__ == "__main__":
     

@@ -6,8 +6,8 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 import time
 
-cSlice = 2117
-rid = 260
+cSlice = 778
+rid = 0
 
 figure=plt.figure()
 #ax = Axes3D(figure)
@@ -37,7 +37,7 @@ for line in all_lines:
     count += 1
 
 print(count)
-X = (np.arange(0, first)/(cSlice*2)*(cSlice-rid)+rid)/44100*340/2
+X = (np.arange(0, first)/(cSlice*2)*(cSlice-rid)+rid)/44100*340
 Y = np.arange(0,count)
 X, Y = np.meshgrid(X,Y)
 Z = np.matrix(Z)

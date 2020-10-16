@@ -220,10 +220,12 @@ class ICommClient:
         else:
             self.TimeoutCount = 0 # 超时计数器清零
 
-    #############雷达检测############
+    #############本地程序############
     def DetectReport(self):
-
-        reset_limit = timedelta(minutes = 15)
+        """
+            调用函数进行雷达检测
+        """
+        reset_limit = timedelta(minutes = 15)   # 每15min自动重置一次
         empty_count = 0
         prompt_count = 0
         Reported=False
@@ -240,7 +242,7 @@ class ICommClient:
                         prompt_count = 0
                         Reported=False
                     #else: 后续判断障碍物是否改变
-                    if prompt_count < 3: # 连续提示次数
+                    if prompt_count < 3:        # 连续提示次数
                         playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         print("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         prompt_count+=1  
@@ -254,11 +256,11 @@ class ICommClient:
                     
                 now_time=datetime.now()
                 for ob in self.Obstacles:    
-                    if ob.IsReport==False:#now_time-ob.FirstAppear > ob.ReportLimit and ob.IsReport==False:
+                    if ob._isReport==False: #now_time-ob._firstAppear > ob._reportLimit and ob._isReport==False:
                         # 拍照上传
                         image_base64=self.picture.takePhoto()
                         self.Send(json.dumps({"cmd": "log", "level": "DETECTED","message":"检测到障碍物！","image": image_base64}))
-                        ob.IsReport=True
+                        ob._isReport=True
                         logger.info("存在障碍物已上报！")
                         Reported=True
                         
