@@ -83,7 +83,7 @@ class URadar:
         cSlice = 2038                                               # 8m
         # 使用本地的扬声器进行检测（集中式模式）
         if MAC == "NoAddress":
-            rid = 390                                               # 3m/2
+            rid = 0                                               # 3m/2
             cSlice = 2117                                           # 16m/2 2117
         for i in self._mics:
             self._plotFile[0].append(None)                          # mics' data in one channel
@@ -233,7 +233,7 @@ class URadar:
 if __name__ == "__main__":
     """ for testing """
     
-    Radar=URadar(MAC="4C:65:A8:56:A7:B3")#)   #0C:70:89:6E:18:E0")#"81:0D:F6:34:02:1B")#4C:65:A8:57:BE:4C
+    Radar=URadar(MAC="NoAddress")#)   #0C:70:89:6E:18:E0")#"81:0D:F6:34:02:1B")#4C:65:A8:57:BE:4C
     reset_choice = input("reset_or_not:")
     if reset_choice == "1": Radar.reset()
 

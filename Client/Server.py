@@ -47,7 +47,7 @@ class ICommClient:
     picture: Picture = Picture()
     Obstacles: list = []
     firstConnect: bool = False
-    report_imm: bool = True #False
+    report_imm: bool = True #
 
     ###########Protected成员#############
     _server_replied_event: Event = Event()  # 用于检测服务器在线
@@ -189,7 +189,7 @@ class ICommClient:
             self._server_replied_event.set()
             
         if message == "reset":
-            self.radar.reset_order=True
+            self.radar._reset_order=True
             self.Obstacles.clear()
             self.Send("resetOk")
                       
@@ -221,20 +221,27 @@ class ICommClient:
 
     #############雷达检测############
     def DetectReport(self):
+        
+        rempty_count = 0
         reset_limit = timedelta(minutes = 15)
-        empty_count = 0
+        Reported = False
+        
         prompt_count = 0
-        Reported=False
-        nonempty_count = 0        
+        empty_count = 0
+        nonempty_count = 0
+        
 
         if self.radar.reset()=="OK":
             reset_time = datetime.now()
             while True:
                 outcome = self.radar.detect()
                 if outcome=="nonempty":
-                    nonempty_count += 1
+                    rempty_count = 0
                     empty_count = 0
-                else: nonempty_count = 0
+                    nonempty_count += 1
+                else:
+                    nonempty_count = 0
+                    empty_count += 1
                 if nonempty_count >= 2:
                     if len(self.Obstacles)==0:
                         obstacle=ObstacleStatus()
@@ -245,7 +252,7 @@ class ICommClient:
                     if prompt_count < 3: # 连续提示次数
                         playprompt("请注意，消防通道禁止阻塞，请立即移除障碍物.wav")
                         prompt_count+=1  
-                if outcome=="empty" and len(self.Obstacles)!=0:
+                if empty_count >= 1 and len(self.Obstacles)!=0:
                     self.Obstacles.clear()
                     playprompt("障碍物已移除，谢谢配合.wav")
                     if Reported==True:
@@ -269,12 +276,14 @@ class ICommClient:
                 # 一段时间后自行reset
                 now_time=datetime.now()
                 if outcome == 'empty' and  now_time-reset_time >= reset_limit :
-                    empty_count+=1
-                    if empty_count==2 and self.radar.reset()=="OK":
+                    rempty_count+=1
+                    if rempty_count==2 and self.radar.reset()=="OK":
                         reset_time = now_time
-                        empty_count = 0
+                        rempty_count = 0
                         logger.info("重置成功！")
                         
+                if outcome=="empty":             
+                    time.sleep(5)
 
 class WebsocketClient(ICommClient):
     """基于Websocket的通讯客户端

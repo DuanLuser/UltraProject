@@ -27,6 +27,12 @@ warnings.filterwarnings("ignore")
 
 logger = logzero.setup_logger("client", level=logging.INFO)
 
+def debug_plot(data, data1, title):
+    plt.figure()
+    plt.title(title)
+    plt.plot(data)
+    plt.plot(data1)
+    plt.show()
  
 class URadar:
     """ 封装类 """
@@ -35,7 +41,7 @@ class URadar:
     _outcome: str
     _prompt: str = "None"
 
-    _mics=[1, 2, 3, 4]
+    _mics=[1,2,4]
     _stability_count = 1
     _reset_order = False
     _micData = []
@@ -44,14 +50,15 @@ class URadar:
     _PATH1="Empty"
     _PATH2="Barrier/barrier"
     
-    def __init__(self, thdz=0.4, thdf=0.45) -> None:      # 0.45   0.45
+    
+    def __init__(self, thdz=1, thdf=1.1) -> None:      # 0.45   0.45
         """
             初始化正向阈值，反向阈值，麦克风对象(MicData)
         """
         self._thdz=thdz
         self._thdf=thdf
         for i in self._mics:
-            self._micData.append(MicData(i, thdz, thdf, 2000, 390))
+            self._micData.append(MicData(i, thdz, thdf, 1815, 518))  # 8m 1.5m
         self._debug=Debug()
         
 
@@ -111,7 +118,7 @@ class URadar:
             
         self._debug.saveSep2threshdFile()
         for i in range(len(self._mics)):
-            print(i+1 ,self._micData[i]._process_result[1],self._micData[i]._process_result[2])
+            print(self._micData[i]._micnum ,self._micData[i]._process_result[1],self._micData[i]._process_result[2])
             self._debug.save2threshdFile(self._micData[i]._process_result[0],\
                                          self._micData[i]._process_result[1],self._micData[i]._process_result[2])
             if self._micData[i]._process_result[1] <= self._thdz and \
@@ -125,10 +132,14 @@ class URadar:
             for k in range(2):   # two speakers
                 if len(self._micData[i]._x_y) and k*2 < len(self._micData[i]._x_y) :
                     self._debug.save2plotStream(self._micData[i]._x_y[k*2+1][1],self._micData[i]._micnum,k)
-            #self._micData[i]._x_y.clear()
+            
+            #debug_plot(self._micData[i]._corr[0],self._micData[i]._corr[1],"corr")
+            self._micData[i]._corr.clear()
         
-        self._debug.plotData(self._micData)
-        for i in range(0,4):
+        
+        #self._debug.plotData(self._micData,0)
+        #self._debug.plotData(self._micData,1)
+        for i in range(0,3):
             self._micData[i]._x_y.clear()
    
         return count
@@ -145,7 +156,7 @@ class URadar:
         self.RecordAudio(self._PATH2)
         count = self.forEveryMic(self._PATH1, self._PATH2)
         # 
-        if count < 4: # 3
+        if count < 3: # 3
             logger.info("检测到环境波动...")
             time.sleep(1)
             # 判断环境是否稳定
@@ -161,10 +172,10 @@ class URadar:
                 PATH2=PATH3
                 postfix+=1
                 scount+=1
-                if count < 4: scount = 0
+                if count < 3: scount = 0
             count = self.forEveryMic(self._PATH1, PATH2)
     
-        if count >= 4: self._outcome="empty"
+        if count >= 3: self._outcome="empty"
         else: self._outcome="nonempty"
 
         logger.info(f"检测结果：{self._outcome}")
@@ -172,7 +183,7 @@ class URadar:
         self._debug.saveOut2threshdFile(self._outcome)
         self._debug.closeFile()
         
-        time.sleep(10)
+        #time.sleep(10)
         return self._outcome
         
 

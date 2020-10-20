@@ -42,6 +42,7 @@ class MicData:
     _thdf: int
     _process_result: list
     _x_y: list               # for plot figure
+    _corr: list
     
     _rate = 44100
     _low = 18000
@@ -55,6 +56,7 @@ class MicData:
         self._rid = rid
         self._process_result=[]
         self._x_y=[]
+        self._corr=[]
         self._micnum = micnum
         self._thdz = thdz
         self._thdf = thdf
@@ -79,24 +81,25 @@ class MicData:
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
 
-        i = 0               
+        i = 2000    #0              
         first = 1
         first_detect = False
         while i+self._distance < corr.size:
             site=np.argmax(corr[i:i+self._distance])+i
-            if corr[site] > 1000000 :
+            if corr[site] > 250000 :
                 c = {}
                 c["PeakIndex"] = site
                 c["PeakHeight"] = corr[site]
                 c["Corr"] = np.abs(corr[site+self._rid:site+self._cSlice])
-                if first % 2 :
+                c["NorCorr"] = c["Corr"]/c["PeakHeight"]
+                if first % 2:
                     peaks_lists[0].append(site)
                     cycles_lists[0].append(c)
-                    debug_print("micnum:%d - site:%d"%(self._micnum, site))
+                    #debug_print("micnum:%d - site:%d"%(self._micnum, site))
                 else:
                     peaks_lists[1].append(site)
                     cycles_lists[1].append(c)
-                    debug_print("micnum:%d = site:%d"%(self._micnum, site))
+                    #debug_print("micnum:%d = site:%d"%(self._micnum, site))
                 if first == 1 :
                     first_detect = True
             if first_detect :
@@ -285,12 +288,12 @@ class MicData:
 
             delta_v=delta_v*math.e**(0.2*maxD) # maxD*maxD           # 与距离有关联，具体待探究
             if delta_v > self._thdz:
-                debug_print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
+                #debug_print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
                 zflag=True
-            elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
-                debug_print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
-            else:
-                debug_print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i])) 
+            #elif delta_v < 0 and abs(delta_v)>self._thdf and zflag == False:
+                #debug_print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i]))
+            #else:
+                #debug_print("%.2fm %f %f"%(maxD, delta_v, delta_v/count[i])) 
             if mx<delta_v:
                 mx=delta_v
                 mxs=i
@@ -313,14 +316,16 @@ class MicData:
             return: null
         """
 
-        filename1 = f"{PATH1}/mic{micnum}.wav"
-        filename2 = f"{PATH2}/mic{micnum}.wav"
+        filename1 = f"{PATH1}/mic.wav"
+        filename2 = f"{PATH2}/mic.wav"
         t = np.arange(0, self._dur_time, 1/self._rate)
         chirp = signal.chirp(t, self._low,self._dur_time, self._high, method = "linear")
 
         """1. 获得音频原始数据"""
-        Fs, y = wavfile.read(filename1) # 空
-        Fs1, y1 = wavfile.read(filename2) # 空
+        Fs, all_y = wavfile.read(filename1) # 空
+        Fs1, all_y1 = wavfile.read(filename2) # 空
+        y = all_y[:,micnum-1]
+        y1 = all_y1[:,micnum-1]
         
         """2. 滤波"""
         fliter_y = self.FilterBandpass(y, Fs)
@@ -333,6 +338,8 @@ class MicData:
         #debug_plot(y,y1,"original")
         #debug_plot(fliter_y,fliter_y1, "filtered")
         #debug_plot(corr,corr1, "corr")
+        self._corr.append(corr)
+        self._corr.append(corr1)
         
         """4. 平均与归一化"""
         Ncorr, Ncorr_1= self.averageNormalization(corr)
