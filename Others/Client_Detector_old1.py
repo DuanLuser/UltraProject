@@ -24,13 +24,8 @@ from forDebug import Debug
 
 import warnings
 warnings.filterwarnings("ignore")
-logger = logzero.setup_logger("client", level=logging.INFO)
 
-def wait_for_data(lists, num):
-    while len(lists) < num: 
-        assert(True)
-    data = lists.pop()       # 取最新采集的数据
-    return data
+logger = logzero.setup_logger("client", level=logging.INFO)
 
 def debug_plot(data, data1, title):
     plt.figure()
@@ -54,22 +49,16 @@ class URadar:
     
     _PATH1="Empty"
     _PATH2="Barrier/barrier"
-    _empty_data:np.array
-    _collect_data = []
-    
-    _micEmpty: []
-    _first = False
-    _channels = 1
     
     
-    def __init__(self, thdz=3, thdf=4) -> None:      # 0.45   0.45
+    def __init__(self, thdz=1, thdf=1.1) -> None:      # 0.45   0.45
         """
             初始化正向阈值，反向阈值，麦克风对象(MicData)
         """
         self._thdz=thdz
         self._thdf=thdf
         for i in self._mics:
-            self._micData.append(MicData(i, thdz, thdf, 1556, 0))  #
+            self._micData.append(MicData(i, thdz, thdf, 1815, 518))  # 7m 2m
         self._debug=Debug()
         
 
@@ -83,47 +72,46 @@ class URadar:
             os.makedirs(self._PATH1)
             
         out = os.popen("python3 playRec.py "+self._PATH1 +" 5").read().replace("\n", "")
+        #out = "OK"
         if out=="OK":
             logger.info("重置成功！")
-            _, self._empty_data = wavfile.read(f"{self._PATH1}/mic.wav")   # 空
         else:
             logger.info("重置失败！")
         return out
 
 
-    def continually_record(self):
+    def RecordAudio(self, PATH):
         """
             采集音频数据,中间会根据服务器的情况进行重置，输出提示音等
             return: null
         """
-        postfix = 0
-        while True:
-            postfix += 1
-            if postfix == 11: postfix = 0
-            PATH = self._PATH2+str(postfix)
-            if not os.path.exists(PATH): os.makedirs(PATH)
+        if not os.path.exists(PATH): os.makedirs(PATH)
             
-            if self._reset_order:
-                self.reset()
-                self._reset_order=False
+        if self._reset_order:
+            self.reset()
+            self._reset_order=False
             
-            #存在提示音要占据音频端口的情况，先播放提示音
-            if self._prompt != "None":
-                #playprompt(self._prompt)
-                print("prompt",self._prompt)
-                self._prompt="None"
+        #存在提示音要占据音频端口的情况，先播放提示音
+        if self._prompt != "None":
+            #playprompt(self._prompt)
+            print("prompt",self._prompt)
+            self._prompt="None"
 
-            out = os.popen("python3 playRec.py "+PATH +" 2").read()
-            _, chs = wavfile.read(f"{PATH}/mic.wav") # 空
-            self._collect_data.append(chs)
+        out = os.popen("python3 playRec.py "+PATH +" 3").read()
+        #print(out)
     
 
-    def forEveryMic(self, chs, chs1):
+    def forEveryMic(self, PATH1, PATH2):
         """
             对每个mic收集的数据进行process处理，并行
             中间可以输出图像
             return: the number of microphones whose result is "empty"
         """
+        file = f"{PATH1}/mic.wav"
+        file1 = f"{PATH2}/mic.wav"
+        _, chs = wavfile.read(file)    # 空
+        _, chs1 = wavfile.read(file1) # 空
+        
         count = 0
         Threads=[]
         for i in range(len(self._mics)):
@@ -141,22 +129,21 @@ class URadar:
             if self._micData[i]._process_result[1] <= self._thdz and \
                abs(self._micData[i]._process_result[2]) <= self._thdf: # 阈值的设定？ empty    有待检验
                 count+=1
-
+            elif self._micData[i]._process_result[1] > 0.6 or \
+                 abs(self._micData[i]._process_result[2]) > 0.65:
+                self._debug.save_valued_data(PATH1, PATH2)
             self._micData[i]._process_result.clear()    # clear original data
             
-            for k in range(2):   # two speakers
+            for k in range(1):   # two speakers
                 if len(self._micData[i]._x_y) and k*2 < len(self._micData[i]._x_y) :
                     self._debug.save2plotStream(self._micData[i]._x_y[k*2+1][1],self._micData[i]._micnum,k)
             
             #debug_plot(self._micData[i]._corr[0],self._micData[i]._corr[1],"corr")
             self._micData[i]._corr.clear()
         
-        if not self._first and len(chs)==len(self._empty_data):
-            self._micEmpty = copy(self._micData)
-            self._first =True
         
-        self._debug.plotData(self._micEmpty, self._micData,0, len(self._mics))
-        self._debug.plotData(self._micEmpty, self._micData,1,len(self._mics))
+        self._debug.plotData(self._micData,0, len(self._mics))
+        #self._debug.plotData(self._micData,1,len(self._mics))
         for i in range(0,len(self._mics)):
             self._micData[i]._x_y.clear()
    
@@ -168,27 +155,30 @@ class URadar:
             检测程序：调用录音等程序，判断环境是否发生波动
             return: the outcome of detecting
         """
-        self._first = False
         # 记录数据
         self._debug.openFile()
         
-        c_data = wait_for_data(self._collect_data,1)
-        count = self.forEveryMic(self._empty_data, c_data)
+        self.RecordAudio(self._PATH2)
+        count = self.forEveryMic(self._PATH1, self._PATH2)
         # 
         if count < len(self._mics): # 3
-            logger.info("检测到环境波动")
+            logger.info("检测到环境波动...")
             time.sleep(1)
             # 判断环境是否稳定
             scount=0
-            c_data = wait_for_data(self._collect_data,1)
+            postfix = 1
+            PATH2=self._PATH2
+            self.RecordAudio(PATH2)
             while scount < self._stability_count:
                 logger.info("持续检测中...")
-                c_data1 = wait_for_data(self._collect_data,1)
-                count = self.forEveryMic(c_data, c_data1)
-                c_data = c_data1
+                PATH3=self._PATH2+str(postfix)
+                self.RecordAudio(PATH3)
+                count = self.forEveryMic(PATH2, PATH3)
+                PATH2=PATH3
+                postfix+=1
                 scount+=1
                 if count < len(self._mics): scount = 0
-            count = self.forEveryMic(self._empty_data, c_data)
+            count = self.forEveryMic(self._PATH1, PATH2)
     
         if count >= len(self._mics): self._outcome="empty"
         else: self._outcome="nonempty"
@@ -208,10 +198,5 @@ if __name__ == "__main__":
     reset_choice = input("reset_or_not:")
     if reset_choice == "1":
         Radar.reset()
-
-    _, Radar._empty_data = wavfile.read(f"{Radar._PATH1}/mic.wav")   # 空
-    record_process = Thread(target=Radar.continually_record)
-    record_process.start()
     while True:
         Radar.detect()
-    record_process.join()

@@ -6,8 +6,8 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 import time
 
-cSlice = 2117
-rid = 260
+cSlice = 2205
+rid = 518
 
 figure=plt.figure()
 #ax = Axes3D(figure)

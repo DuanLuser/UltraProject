@@ -6,7 +6,7 @@ class Debug:
     """
         储存数据，输出图像，调试用
     """
-    _saveFlag = False # True #
+    _saveFlag = True # False# 
     
     _plotLprefix = "MIC/LMic/data"
     _plotRprefix = "MIC/RMic/data"
@@ -15,6 +15,9 @@ class Debug:
 
     _targetEprefix = "MIC/Wanted/empty"
     _targetBprefix = "MIC/Wanted/barrier"
+    
+    fig = None
+    fig1 = None
 
     def __init__(self)->None:
         """
@@ -26,7 +29,8 @@ class Debug:
             self._plotStream[0].append(None)
             self._plotStream[1].append(None)
         
-        plt.figure(figsize=(12, 12))
+        self.fig = plt.figure(figsize=(7, 7))
+        self.fig1 = plt.figure(figsize=(7, 7))
 
     def openFile(self):
         """
@@ -76,6 +80,7 @@ class Debug:
             一行数据（data）代表某时刻的检测结果
         """
         if self._saveFlag:
+            #print(len(data))
             for d in data:
                 self._plotStream[channel][mic-1].write(("%.5f"%d)+",")
             self._plotStream[channel][mic-1].write("\n")
@@ -97,25 +102,29 @@ class Debug:
             shutil.copyfile(''.join([barrier_data,'/mic.wav']),\
                     ''.join([target_bfile+'/mic.wav']))
 
-    def plotData(self, Data, LR):
-        plt.clf()               # clear previous data
+    def plotData(self, Empty, Data, LR, num):
+        if LR == 0:
+            self.fig.clf()               # clear previous data
+        else:
+            self.fig1.clf()
         plt.ion()
         plt.show()
-        for i in range(0,3):
-            plt.subplot(3,1,i+1)
-            plt.ylim(0,0.2)
+        for i in range(0,num):
             if LR == 0:
-                plt.plot(Data[i]._x_y[0][0], Data[i]._x_y[0][1], linewidth=1)
-                plt.plot(Data[i]._x_y[1][0], Data[i]._x_y[1][1], c="red",linewidth=1)
+                ax = self.fig.add_subplot(num,1,i+1)
+                ax.set_ylim(0,0.2)
+                ax.plot(Empty[i]._x_y[0][0], Data[i]._x_y[0][1], linewidth=1)
+                ax.plot(Empty[i]._x_y[1][0], Data[i]._x_y[1][1], c="red",linewidth=1)
             else :
-                plt.plot(Data[i]._x_y[2][0], Data[i]._x_y[2][1], linewidth=1)
-                plt.plot(Data[i]._x_y[3][0], Data[i]._x_y[3][1], c="red",linewidth=1)
+                ax = self.fig1.add_subplot(num,1,i+1)
+                ax.set_ylim(0,0.2)
+                ax.plot(Empty[i]._x_y[2][0], Data[i]._x_y[2][1], linewidth=1)
+                ax.plot(Empty[i]._x_y[3][0], Data[i]._x_y[3][1], c="red",linewidth=1)
             plt.title("mic"+str(Data[i]._micnum))
             label=["Empty","The other"]
             plt.legend(label, loc =0)
         plt.xlabel("Distance(m)")
         plt.ylabel("Correlation")
-        plt.pause(1)
-    
+        plt.pause(0.01)
     
     

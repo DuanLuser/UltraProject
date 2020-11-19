@@ -14,7 +14,7 @@ from setvolume import setvol
 
 def play_with_Usb(audio):
     
-    os.system("aplay -D plughw:0,0 "+audio)
+    os.system("aplay -D sysdefault:CARD=Headphones "+audio)
     #os.system("aplay -D bluealsa:DEV=4C:65:A8:56:A7:B3,PROFILE=A2DP "+audio)
 
 
@@ -44,10 +44,12 @@ class TdmaPlay:
         cwd = ""
         if Second=="5":
             cwd="audio/reset/"
-        if Second=="3":
-            cwd="audio/detect/"
-        if Second=="2":
-            cwd="audio/test/"   
+        elif Second=="3":
+            cwd="audio/detect-3s/"
+        elif Second=="2":
+            cwd="audio/detect-2s/" 
+        elif Second=="1":
+            cwd="audio/detect-1s/"
         sound_file_paths = [
             os.path.join(cwd, path) for path in sorted(filter(lambda path: self.good_filepath(path), os.listdir(cwd)))]
         
@@ -71,11 +73,11 @@ def playprompt(wav):
        播放提示音
        return: null
     """
-    #setvol("70%")
-    #os.system('aplay audio/prompt/'+ wav)  # the default port is USB audio card
+    #setvol("72%")
+    #os.system('aplay -D sysdefault:CARD=Headphones audio/prompt/'+ wav)  
     hour = datetime.datetime.now().hour
     #if hour >= 7 and hour <= 20:
-    #    os.system('aplay -D sysdefault:CARD=Device audio/prompt/'+ wav)  # corresponding USD audio card
+    #    os.system('aplay -D sysdefault:CARD=Headphones audio/prompt/'+ wav)  # corresponding headphones audio card
     '''
     if wav == "网络连接成功.wav":
         time.sleep(2)
@@ -86,7 +88,7 @@ def playprompt(wav):
     elif wav == "请注意，消防通道禁止阻塞，请立即移除障碍物.wav":
         time.sleep(5)
     '''
-    setvol("90%") 
+    setvol("98%") 
             
 
 if __name__ == "__main__":

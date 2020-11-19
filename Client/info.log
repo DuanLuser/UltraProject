@@ -1,37 +1,23 @@
 Unable to init server: Could not connect: Connection refused
 Unable to init server: 无法连接：Connection refused
 
-(Server.py:529): Gdk-CRITICAL **: 14:20:31.274: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
+(Server.py:540): Gdk-CRITICAL **: 17:28:01.814: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
 
-(Server.py:529): Gdk-CRITICAL **: 14:20:31.278: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
-[I 201020 14:20:42 Server:318] 正在尝试连接到服务器...
-[I 201020 14:20:42 Server:119] 连接到服务器成功: ws://47.100.88.177:2714
-[I 201020 14:20:42 Detector:70] 正在重置...
-[I 201020 14:20:43 Server:183] 收到服务器消息：registerOk
+(Server.py:540): Gdk-CRITICAL **: 17:28:01.821: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
+[I 201020 17:28:13 Server:318] 正在尝试连接到服务器...
+[I 201020 17:28:14 Server:119] 连接到服务器成功: ws://47.100.88.177:2714
+[I 201020 17:28:14 Detector:70] 正在重置...
+[I 201020 17:28:14 Server:183] 收到服务器消息：registerOk
 Playing WAVE 'audio/reset/18k-22k10ms-LR20.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Stereo
 OK
-[I 201020 14:20:51 Detector:77] 重置成功！
-[I 201020 14:20:52 Server:207] Pinging server...
-[I 201020 14:20:53 Server:183] 收到服务器消息：pong
-Run time of job "ICommClient.CheckAlive (trigger: interval[0:00:10], next run at: 2020-10-20 14:21:02 CST)" was missed by 0:00:09.019381
-[I 201020 14:22:42 Server:207] Pinging server...
-[I 201020 14:22:43 Server:183] 收到服务器消息：pong
+[I 201022 16:37:41 Detector:77] 重置成功！
+Run time of job "ICommClient.CheckAlive (trigger: interval[0:00:10], next run at: 2020-10-20 17:28:24 CST)" was missed by 0:00:09.059472
+Run time of job "ICommClient.CheckAlive (trigger: interval[0:00:10], next run at: 2020-10-22 16:37:44 CST)" was missed by 0:00:02.329802
 Playing WAVE 'audio/detect/18k-22k10ms-LR10.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Stereo
 OK
-1 17.44531891910633 -0.021637591273012485
-2 6.420913853385848 -0.010610241842779406
-4 0.8152234260313933 -0.005760600033784772
-[I 201020 14:22:52 Server:207] Pinging server...
-[I 201020 14:22:53 Server:183] 收到服务器消息：pong
-[I 201020 14:23:02 Server:207] Pinging server...
-[I 201020 14:23:03 Server:183] 收到服务器消息：pong
-[I 201020 14:23:13 Server:207] Pinging server...
-[I 201020 14:23:13 Server:183] 收到服务器消息：pong
-[I 201020 14:23:23 Server:207] Pinging server...
-[I 201020 14:23:23 Server:183] 收到服务器消息：pong
-[I 201020 14:23:33 Server:207] Pinging server...
-[I 201020 14:23:33 Server:183] 收到服务器消息：pong
-[I 201020 14:23:42 Server:207] Pinging server...
-[I 201020 14:23:43 Server:183] 收到服务器消息：pong
-[I 201020 14:23:53 Server:207] Pinging server...
-[I 201020 14:23:53 Server:183] 收到服务器消息：pong
+1 0.7769595188453703 -0.0021021550211374994
+2 1.2542836568590108 -0.0010338155839256353
+4 0.24305337448110995 -0.08764148988263411
+[I 201022 16:37:53 Detector:160] 检测到环境波动...
+[I 201022 16:37:54 Server:207] Pinging server...
+[I 201022 16:37:54 Server:183] 收到服务器消息：pong

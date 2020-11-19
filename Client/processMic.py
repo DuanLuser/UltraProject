@@ -36,7 +36,7 @@ def debug_plot(data, data1, title):
 class MicData:
     """ 存储每个麦克风的数据信息 """
     _micnum: int
-    _cSlice: int             # 988       # 3.5 m
+    _cSlice: int             # 988          # 3.5 m
     _rid: int                # 70           # no obstacles in 25 cm 
     _thdz: int
     _thdf: int
@@ -49,7 +49,7 @@ class MicData:
     _high = 22000
     _dur_time = 10/1000       # 10ms
     _distance = 4851          # t=0.11s;  rate=44100
-    _nor_val = 1000000        # 经验值
+    _nor_val = 2000000        # 经验值
 
     def __init__(self, micnum: int, thdz: int, thdf: int, cSlice: int, rid: int) -> None:
         self._cSlice = cSlice
@@ -81,12 +81,13 @@ class MicData:
         peaks_lists = [[]for i in range(2)]
         cycles_lists = [[]for i in range(2)]
 
-        i = 2000    #0              
+        i = 5000    #0              
         first = 1
         first_detect = False
         while i+self._distance < corr.size:
             site=np.argmax(corr[i:i+self._distance])+i
-            if corr[site] > 250000 :
+            if self._nor_val<corr[site]: self._nor_val=corr[site]
+            if corr[site] > 2500000 :
                 c = {}
                 c["PeakIndex"] = site
                 c["PeakHeight"] = corr[site]
@@ -106,8 +107,8 @@ class MicData:
                 first += 1
             i += self._distance
     
-        debug_print("micnum:%d, len(peaks_lists)[%d]:%d"%(self._micnum,0,len(peaks_lists[0])))
-        debug_print("micnum:%d, len(peaks_lists)[%d]:%d"%(self._micnum,1,len(peaks_lists[1])))
+        print("micnum:%d, len(peaks_lists)[%d]:%d"%(self._micnum,0,len(peaks_lists[0])))
+        print("micnum:%d, len(peaks_lists)[%d]:%d"%(self._micnum,1,len(peaks_lists[1])))
 
         out = np.zeros(self._cSlice-self._rid)
         out1 = np.zeros(self._cSlice-self._rid)
@@ -131,6 +132,24 @@ class MicData:
                 length = len(cycles_lists[i])-count
                 out1 = out1/length  # 平均
         return out, out1
+    
+    def upper_env(self, seq):
+        """
+            包络检波, 共两步
+            return : smooth
+        """
+        # 1.1 提取极值点
+        x=signal.argrelextrema(seq, np.greater)[0]
+        x = np.insert(x,0,0)
+        x = np.append(x, seq.size-1)
+        y=seq[x]
+        if len(x)<=2: return [],[]
+        # 1.2 统一坐标轴，插值平滑
+        x_new = np.linspace(x[0],x[-1],self._cSlice) #!!!_cSlice的大小会影响每个区域点的个数
+        func=interpolate.interp1d(x,y, kind="cubic")
+        y_smooth=func(x_new)
+        return x_new, y_smooth
+        
 
     def afterAN(self, Ncorr, Ncorr1, micnum):
         """
@@ -146,37 +165,21 @@ class MicData:
         aNcorr = Ncorr/self._nor_val            
         aNcorr1 = Ncorr1/self._nor_val
 
-        """1. 包络检波部分，共两步"""
-        # 1.1 提取极值点
-        x=signal.argrelextrema(aNcorr, np.greater)[0]
-        y=aNcorr[x]
-        x1=signal.argrelextrema(aNcorr1, np.greater)[0]
-        y1=aNcorr1[x1]
-        #for safety
-        if x.size <=0 or x1.size <= 0:
-            return micnum,0,0
+        """1. 包络检波部分"""
+        x_new, y_smooth = self.upper_env(aNcorr)
+        x_new1, y_smooth1 = self.upper_env(aNcorr1)
     
-        # 1.2 统一坐标轴，插值平滑
-        x_min = max(x[0],x1[0])
-        x_max = min(x[x.size-1],x1[x1.size-1])
-        x_new = np.linspace(x_min,x_max,self._cSlice*2) #!!!_cSlice的大小会影响每个区域点的个数
-        func=interpolate.interp1d(x,y, kind="cubic")
-        y_smooth=func(x_new)
-        func1=interpolate.interp1d(x1,y1, kind="cubic")
-        y_smooth1=func1(x_new)
-        debug_print("Type:%s"%(type(y_smooth1)))
-        
         self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth])
         self._x_y.append([(x_new+self._rid)/self._rate*340/2,y_smooth1])
         
         """ 2. 提取图2(The Other)中高于/低于图1(Empty)的所有点"""
-        X=np.zeros(self._cSlice*2)      # 记录目标区间的x轴值，非目标区间统一设置为 -0.01
-        Y=np.zeros(self._cSlice*2)      # 记录背景信号的y轴值
-        Y1=np.zeros(self._cSlice*2)     # 记录当前信号的y轴值
+        X=np.zeros(self._cSlice)      # 记录目标区间的x轴值，非目标区间统一设置为 -0.01
+        Y=np.zeros(self._cSlice)      # 记录背景信号的y轴值
+        Y1=np.zeros(self._cSlice)     # 记录当前信号的y轴值
 
         i=0
-        while i < self._cSlice*2:
-            while i < self._cSlice*2 and y_smooth1[i] != y_smooth[i] :
+        while i < self._cSlice:
+            while i < self._cSlice and y_smooth1[i] != y_smooth[i] :
                 X[i]=x_new[i]
                 Y[i]=y_smooth[i]
                 Y1[i]=y_smooth1[i]
@@ -187,14 +190,14 @@ class MicData:
                     X[i-1]=-0.01
                     Y[i-1]=Y1[i-1]=0
                 i+=1
-            if i == self._cSlice*2 : break
+            if i == self._cSlice : break
         
             X[i]=-0.01
             Y[i]=Y1[i]=0
             i+=1
 
         """3. 去除不对称的峰, 启发式"""
-        site=self._cSlice*2  # site=i
+        site=self._cSlice  # site=i
         addc=0
         minusc=0
         mark=site
@@ -283,7 +286,7 @@ class MicData:
 
         debug_print("mic:%d"%micnum)
         for i in range(snum):
-            delta_v=(cgma1[i]-cgma[i])*15#val1[i]-val[i]#
+            delta_v=(cgma1[i]-cgma[i]) #val1[i]-val[i]#
             maxD=(X[int(maxsite[i])]+self._rid)/self._rate*340/2
 
             delta_v=delta_v*math.e**(0.2*maxD) # maxD*maxD           # 与距离有关联，具体待探究
@@ -305,7 +308,7 @@ class MicData:
         return micnum,mx,mi
     
     
-    def process(self, PATH1, PATH2, micnum):
+    def process(self, chs, chs1, micnum):
         """
             处理音频：
             1. 获得音频原始数据
@@ -316,20 +319,16 @@ class MicData:
             return: null
         """
 
-        filename1 = f"{PATH1}/mic.wav"
-        filename2 = f"{PATH2}/mic.wav"
         t = np.arange(0, self._dur_time, 1/self._rate)
         chirp = signal.chirp(t, self._low,self._dur_time, self._high, method = "linear")
 
         """1. 获得音频原始数据"""
-        Fs, all_y = wavfile.read(filename1) # 空
-        Fs1, all_y1 = wavfile.read(filename2) # 空
-        y = all_y[:,micnum-1]
-        y1 = all_y1[:,micnum-1]
+        y = chs[:,micnum-1]
+        y1 = chs1[:,micnum-1]
         
         """2. 滤波"""
-        fliter_y = self.FilterBandpass(y, Fs)
-        fliter_y1 = self.FilterBandpass(y1, Fs1)
+        fliter_y = self.FilterBandpass(y, self._rate)
+        fliter_y1 = self.FilterBandpass(y1, self._rate)
 
         """3. 互相关"""
         corr = np.abs(np.correlate(fliter_y, chirp, mode="full"))
